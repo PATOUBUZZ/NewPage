@@ -2,81 +2,31 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Actualités Économiques</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f2f4f8;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-      color: #222;
-    }
-    .news-container {
-      max-width: 800px;
-      margin: auto;
-    }
-    .news-item {
-      background: white;
-      border-left: 5px solid #2c3e50;
-      padding: 15px;
-      margin: 10px 0;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .news-item h2 {
-      margin: 0 0 10px;
-      font-size: 18px;
-      color: #2c3e50;
-    }
-    .news-item small {
-      color: #888;
-    }
-    .news-item a {
-      text-decoration: none;
-      color: #2980b9;
-      font-weight: bold;
-    }
-  </style>
+  <title>News Économiques</title>
 </head>
 <body>
-  <h1>📰 Actualités Économiques Automatiques</h1>
-  <div class="news-container" id="news-container">
-    <p>Chargement des actualités...</p>
-  </div>
+  <h1>📢 Dernières news économiques</h1>
+  <div id="news-container">Chargement en cours...</div>
 
   <script>
-    const apiKey = "pub_6a71acd0bc004d39bf3f1a6297de5577";
-    const apiUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=forex&language=fr&category=business`;
-
-    fetch(apiUrl)
-      .then(res => res.json())
+    fetch("https://newsdata.io/api/1/news?apikey=pub_6a71acd0bc004d39bf3f1a6297de5577&language=fr&category=business")
+      .then(response => response.json())
       .then(data => {
         const container = document.getElementById("news-container");
-        container.innerHTML = ""; // Vider le message de chargement
-
-        if (!data.results || data.results.length === 0) {
-          container.innerHTML = "<p>Aucune actualité disponible pour le moment.</p>";
-          return;
+        if (data.results && data.results.length > 0) {
+          container.innerHTML = data.results.map(news => `
+            <div style="margin-bottom: 1em;">
+              <strong>${news.title}</strong><br/>
+              <a href="${news.link}" target="_blank">Lire l’article</a>
+            </div>
+          `).join("");
+        } else {
+          container.innerHTML = "Aucune news disponible pour le moment.";
         }
-
-        data.results.forEach(item => {
-          const div = document.createElement("div");
-          div.className = "news-item";
-          div.innerHTML = `
-            <h2>${item.title}</h2>
-            <small>🕒 ${new Date(item.pubDate).toLocaleString('fr-FR')}</small><br>
-            <a href="${item.link}" target="_blank">Lire l'article</a>
-          `;
-          container.appendChild(div);
-        });
       })
       .catch(error => {
-        document.getElementById("news-container").innerHTML = `<p>Erreur lors du chargement des actualités : ${error.message}</p>`;
-        console.error(error);
+        document.getElementById("news-container").innerHTML = "Erreur de chargement des news.";
+        console.error("Erreur API :", error);
       });
   </script>
 </body>
