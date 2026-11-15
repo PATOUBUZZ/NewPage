@@ -7,7 +7,7 @@
 
   var DEFAUTS = {
     supabaseUrl: '', supabaseKey: '', cacheMinutes: 5, couleur: '#2563eb', devise: 'FCFA',
-    lotAffichage: 12, vitesseBande: 45, cleCache: 'nb_cache_v1', cleePanier: 'nb_panier_v1'
+    lotAffichage: 12, vitesseBande: 45, whatsappSupport: '', cleCache: 'nb_cache_v1', cleePanier: 'nb_panier_v1'
   };
   var cfg = {};
   var src = window.NB_CONFIG || {};
