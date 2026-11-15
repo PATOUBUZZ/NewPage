@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#2563eb">
+  <title>Espace propriétaire</title>
+  <link rel="stylesheet" href="vendeur.css">
+</head>
+<body>
+
+  <!-- ═════ ÉCRAN 1 : connexion Google ═════ -->
+  <section class="screen" id="v-login" hidden>
+    <div class="login-card">
+      <div class="login-logo" id="login-logo"></div>
+      <h1>Espace propriétaire</h1>
+      <p>Connectez-vous avec le compte Google enregistré pour gérer votre boutique : produits, bande défilante et informations.</p>
+      <button class="btn btn-google" id="btn-login" type="button"><span class="g-dot">G</span> Se connecter avec Google</button>
+      <p class="hint">Accès réservé au propriétaire de la boutique.</p>
+      <p class="form-error" id="login-error" role="alert" hidden></p>
+    </div>
+  </section>
+
+  <!-- ═════ ÉCRAN 2 : compte Google non autorisé ═════ -->
+  <section class="screen" id="v-denied" hidden>
+    <div class="login-card">
+      <h1>Accès refusé</h1>
+      <p>Le compte <strong id="denied-email"></strong> n'est pas autorisé à gérer cette boutique.</p>
+      <p class="hint">Connectez-vous avec l'adresse Gmail communiquée au développeur lors de la mise en place de votre boutique.</p>
+      <button class="btn btn-primary" id="btn-denied-out" type="button">Changer de compte</button>
+    </div>
+  </section>
+
+  <!-- ═════ ÉCRAN 3 : tableau de bord ═════ -->
+  <div id="v-app" hidden>
+    <header class="app-head">
+      <div class="app-title"><strong id="app-shop">Ma boutique</strong><small id="app-email"></small></div>
+      <div class="app-head-actions">
+        <a class="btn btn-ghost" id="btn-view-shop" href="index.html" target="_blank" rel="noopener"><span data-icon="external"></span> Voir ma boutique</a>
+        <button class="btn btn-ghost" id="btn-logout" type="button"><span data-icon="logout"></span> Quitter</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" role="tab" data-tab="produits" aria-selected="true">Produits <span class="tab-n" id="n-produits">0</span></button>
+      <button class="tab" role="tab" data-tab="bande" aria-selected="false">Bande défilante</button>
+      <button class="tab" role="tab" data-tab="boutique" aria-selected="false">Ma boutique</button>
+    </nav>
+
+    <main class="panels">
+      <p class="notice" id="cache-notice">Vos modifications sont publiées <strong>immédiatement</strong>. Les visiteurs les voient après <strong id="cache-min">5</strong> minutes environ (mémoire du site).</p>
+
+      <!-- ── Produits ── -->
+      <section class="panel" id="panel-produits">
+        <div class="bar">
+          <input class="field" id="search" type="search" placeholder="Rechercher un produit…" aria-label="Rechercher un produit">
+          <button class="btn btn-primary" id="btn-add" type="button"><span data-icon="plus"></span> Ajouter</button>
+        </div>
+        <p class="count" id="count-line"></p>
+        <ul class="list" id="prod-list"></ul>
+        <p class="empty" id="prod-empty" hidden>Aucun produit. Appuyez sur « Ajouter » pour créer le premier.</p>
+      </section>
+
+      <!-- ── Bande défilante ── -->
+      <section class="panel" id="panel-bande" hidden>
+        <div class="bar">
+          <p class="muted">Messages qui défilent tout en haut de votre site (10 maximum).</p>
+          <button class="btn btn-primary" id="btn-add-ann" type="button"><span data-icon="plus"></span> Ajouter</button>
+        </div>
+        <ul class="list" id="ann-list"></ul>
+        <p class="empty" id="ann-empty" hidden>Aucun message : la bande est masquée sur votre site.</p>
+      </section>
+
+      <!-- ── Ma boutique ── -->
+      <section class="panel" id="panel-boutique" hidden>
+        <form id="form-boutique" class="card-form" novalidate>
+          <div class="logo-row">
+            <div class="logo-preview" id="b-logo-prev"></div>
+            <div>
+              <label class="btn btn-ghost" for="b-logo-file"><span data-icon="image"></span> Choisir un logo</label>
+              <input id="b-logo-file" type="file" accept="image/*" hidden>
+              <button class="btn btn-link" id="b-logo-del" type="button">Retirer le logo</button>
+              <p class="hint" id="b-logo-info">Image carrée conseillée.</p>
+            </div>
+          </div>
+          <label for="b-nom">Nom de la boutique *</label>
+          <input class="field" id="b-nom" maxlength="60" required>
+          <label for="b-prop">Nom du propriétaire</label>
+          <input class="field" id="b-prop" maxlength="80" autocomplete="name">
+          <label for="b-desc">Description de la boutique</label>
+          <textarea class="field" id="b-desc" rows="4" maxlength="500" placeholder="Que vendez-vous ? Pourquoi vous faire confiance ?"></textarea>
+          <div class="two">
+            <div><label for="b-ville">Ville</label><input class="field" id="b-ville" maxlength="60" placeholder="Ex : Cotonou"></div>
+            <div><label for="b-loc">Localisation précise</label><input class="field" id="b-loc" maxlength="200" placeholder="Ex : Fidjrossè, près du marché"></div>
+          </div>
+          <label for="b-wa">Numéro WhatsApp (avec l'indicatif, sans + ni espaces) *</label>
+          <input class="field" id="b-wa" inputmode="tel" maxlength="30" placeholder="Ex : 22961000000">
+          <p class="hint">C'est sur ce numéro que vos clients envoient leurs commandes.</p>
+          <p class="form-error" id="b-error" role="alert" hidden></p>
+          <button class="btn btn-primary btn-block" id="b-save" type="submit">Enregistrer ma boutique</button>
+          <p class="dev-line" id="dev-line"></p>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <!-- ═════ FENÊTRE : produit (ajout / modification) ═════ -->
+  <div class="modal" id="modal-prod" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <form class="modal-box" id="form-prod" role="dialog" aria-modal="true" aria-labelledby="mp-title" novalidate>
+      <div class="modal-head"><h2 id="mp-title">Nouveau produit</h2><button class="icon-btn" type="button" data-close aria-label="Fermer"></button></div>
+      <div class="modal-body">
+        <label>Photos (1 à 4) *</label>
+        <div class="photos" id="photos"></div>
+        <input id="p-files" type="file" accept="image/*" multiple hidden>
+        <p class="hint" id="photo-info">La 1re photo est l'image principale. Les photos sont automatiquement allégées (≈ 130 Ko, WebP) sans perte visible.</p>
+
+        <label for="p-nom">Nom du produit *</label>
+        <input class="field" id="p-nom" maxlength="120" required>
+        <div class="two">
+          <div><label for="p-prix">Prix (<span class="devise">FCFA</span>) *</label><input class="field" id="p-prix" type="number" inputmode="numeric" min="1" max="100000000" step="1" required></div>
+          <div><label for="p-ancien">Ancien prix (facultatif)</label><input class="field" id="p-ancien" type="number" inputmode="numeric" min="2" max="100000000" step="1" placeholder="Prix barré"></div>
+        </div>
+        <p class="hint">Promotion : mettez ici votre prix habituel (supérieur au prix). Il s'affichera barré avec le pourcentage de réduction.</p>
+        <label for="p-desc">Description</label>
+        <textarea class="field" id="p-desc" rows="4" maxlength="600" placeholder="Décrivez votre produit en quelques lignes."></textarea>
+        <label for="p-carac">Caractéristiques (une par ligne, 15 maximum)</label>
+        <textarea class="field" id="p-carac" rows="4" placeholder="Matière : coton&#10;Tailles : S, M, L"></textarea>
+        <label for="p-plus">Plus d'informations <span class="counter" id="plus-count">0 / 60 mots</span></label>
+        <textarea class="field" id="p-plus" rows="4" placeholder="Message marketing pour convaincre vos clients (60 mots maximum) : garantie, livraison, pourquoi ce produit…"></textarea>
+        <div class="two">
+          <div><label for="p-ordre">Position (facultatif)</label><input class="field" id="p-ordre" type="number" inputmode="numeric" value="0" step="1"></div>
+          <div class="check-col"><label class="check"><input id="p-visible" type="checkbox" checked> Visible sur le site</label></div>
+        </div>
+        <p class="hint">« Position » ne sert que si le mélange aléatoire est désactivé : 0 = en premier.</p>
+        <p class="form-error" id="p-error" role="alert" hidden></p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" type="button" data-close>Annuler</button>
+        <button class="btn btn-primary" id="p-save" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ═════ FENÊTRE : message de la bande défilante ═════ -->
+  <div class="modal" id="modal-ann" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <form class="modal-box" id="form-ann" role="dialog" aria-modal="true" aria-labelledby="ma-title" novalidate>
+      <div class="modal-head"><h2 id="ma-title">Message de la bande</h2><button class="icon-btn" type="button" data-close aria-label="Fermer"></button></div>
+      <div class="modal-body">
+        <label for="a-msg">Message * <span class="counter" id="a-count">0 / 160</span></label>
+        <input class="field" id="a-msg" maxlength="160" placeholder="Ex : 🔥 Livraison gratuite ce week-end">
+        <label for="a-lien">Lien (facultatif)</label>
+        <input class="field" id="a-lien" maxlength="500" placeholder="https://wa.me/22961000000">
+        <p class="hint">Si vous mettez un lien, le message devient cliquable. Il doit commencer par https://</p>
+        <label class="check"><input id="a-visible" type="checkbox" checked> Affiché sur le site</label>
+        <p class="form-error" id="a-error" role="alert" hidden></p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" type="button" data-close>Annuler</button>
+        <button class="btn btn-primary" id="a-save" type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="busy" id="busy" hidden><div class="spin"></div><p id="busy-msg">Veuillez patienter…</p></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  <script src="vendeur.js"></script>
+</body>
+</html>
