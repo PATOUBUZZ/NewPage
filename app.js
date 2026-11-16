@@ -42,8 +42,26 @@
     return a;
   }
 
+  /* Lien court : « …/#a1b2c3d4 » (8 caractères tirés de l'identifiant), comme sur Nya-Market.
+     Les anciens liens longs « ?p=identifiant » continuent de fonctionner. */
+  function construireCodes() {
+    etat.codeDe = {}; etat.parCode = {};
+    Object.keys(etat.parId).forEach(function (id) {
+      var brut = id.replace(/-/g, '').toLowerCase(), c = brut.slice(0, 8);
+      if (etat.parCode[c]) c = brut;                                    // collision (quasi impossible) : code complet
+      etat.codeDe[id] = c; etat.parCode[c] = id;
+    });
+  }
   function lienProduit(id) {
-    return location.origin + location.pathname + '?p=' + encodeURIComponent(id);
+    return location.origin + location.pathname + '#' + (etat.codeDe && etat.codeDe[id] || encodeURIComponent(id));
+  }
+  /** Identifiant du produit demandé par l'adresse de la page (#code, ou ancien ?p=…) ; null si aucun */
+  function idDansUrl() {
+    var h = decodeURIComponent(location.hash.replace(/^#/, '')).toLowerCase().trim();
+    if (h && etat.parCode[h]) return etat.parCode[h];
+    var q = new URLSearchParams(location.search).get('p');
+    if (q && etat.parId[q]) return q;
+    return null;
   }
 
   function pourcentage(p) {
@@ -299,7 +317,7 @@
     etat.vue = 'detail';
     $('grid-view').hidden = true; $('detail-view').hidden = false; $('all-btn').hidden = false;
     document.title = p.nom + ' · ' + (etat.boutique.nom || 'Boutique');
-    if (pousser) { try { history.pushState({ p: id }, '', '?p=' + encodeURIComponent(id)); } catch (e) { /* file:// */ } }
+    if (pousser) { try { history.pushState({ p: id }, '', location.pathname + '#' + etat.codeDe[id]); } catch (e) { /* file:// */ } }
     window.scrollTo(0, 0);
   }
 
@@ -373,10 +391,11 @@
     e.preventDefault();
     var err = $('order-error'); err.hidden = true;
     var nom = $('o-nom').value.trim(), tel = $('o-tel').value.trim(), adr = $('o-adresse').value.trim(), note = $('o-note').value.trim();
+    var gps = etat.position;
     function erreur(m) { err.textContent = m; err.hidden = false; }
     if (!etat.panier.length) return erreur('Votre panier est vide.');
     if (nom.length < 2) return erreur('Indiquez votre nom.');
-    if (adr.length < 3) return erreur('Indiquez votre quartier ou adresse de livraison.');
+    if (adr.length < 3 && !gps) return erreur('Indiquez votre quartier ou adresse de livraison (ou touchez « Utiliser ma position »).');
     var num = NB.chiffres(etat.boutique.whatsapp);
     if (!num) return erreur('Le vendeur n’a pas encore renseigné son numéro WhatsApp.');
 
@@ -387,7 +406,8 @@
     });
     lignes.push('', '*Total : ' + NB.prix(total()) + '*', '', '👤 ' + nom);
     if (tel) lignes.push('📞 ' + tel);
-    lignes.push('📍 ' + adr);
+    if (adr) lignes.push('📍 ' + adr);
+    if (gps) lignes.push('🧭 Position GPS (±' + gps.precision + ' m) : https://www.google.com/maps?q=' + gps.lat + ',' + gps.lng);
     if (note) lignes.push('📝 ' + note);
     lignes.push('', 'Paiement à la livraison.');
 
@@ -396,19 +416,46 @@
     if (w) { try { w.opener = null; } catch (err) { /* sans gravité */ } }
     else location.href = url;                                 // fenêtre bloquée : on ouvre dans le même onglet
     etat.panier = []; sauverPanier(); fermerPanier(); toast('Commande prête : validez l’envoi dans WhatsApp ✓');
-    $('order-form').reset();
+    $('order-form').reset(); retirerPosition();
   }
+
+  /* ───────────────────────────── Position GPS du client (facultative) ─────────────────────────────
+     Le client touche « Utiliser ma position » : le navigateur demande son accord, puis le lien Google Maps de sa
+     position est ajouté au message WhatsApp. Rien n'est enregistré ni envoyé ailleurs ; fonctionne en https uniquement. */
+  function majPosition(texte, classe, avecRetrait) {
+    var s = $('geo-status'); s.textContent = texte || ''; s.className = 'geo-status' + (classe ? ' ' + classe : ''); s.hidden = !texte;
+    if (avecRetrait) { var b = el('button', { type: 'button', text: 'Retirer' }); b.onclick = retirerPosition; s.appendChild(b); }
+  }
+  function retirerPosition() { etat.position = null; majPosition(''); $('geo-label').textContent = 'Utiliser ma position (GPS)'; }
+  function obtenirPosition() {
+    var btn = $('geo-btn');
+    if (!navigator.geolocation) return majPosition('La position n’est pas disponible sur cet appareil : écrivez votre quartier.', 'ko');
+    btn.disabled = true; $('geo-label').textContent = 'Recherche de votre position…'; majPosition('');
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      btn.disabled = false;
+      etat.position = { lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6), precision: Math.round(pos.coords.accuracy || 0) };
+      $('geo-label').textContent = 'Actualiser ma position';
+      majPosition('📍 Position ajoutée ✓ (précision ≈ ' + etat.position.precision + ' m)', 'ok', true);
+    }, function (err) {
+      btn.disabled = false; $('geo-label').textContent = 'Utiliser ma position (GPS)';
+      majPosition(err && err.code === 1 ? 'Position refusée : autorisez la localisation dans votre navigateur, ou écrivez votre quartier.'
+        : err && err.code === 3 ? 'Position trop longue à obtenir : réessayez, ou écrivez votre quartier.'
+        : 'Position introuvable : écrivez votre quartier.', 'ko');
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  }
+
 
   /* ───────────────────────────── Navigation (historique du navigateur) ───────────────────────────── */
   function surNavigation() {
-    var id = new URLSearchParams(location.search).get('p');
-    if (id && etat.parId[id]) ouvrirProduit(id, false); else afficherVueGrille(false);
+    var id = idDansUrl();
+    if (id) ouvrirProduit(id, false); else afficherVueGrille(false);
   }
 
   /* ───────────────────────────── Démarrage ───────────────────────────── */
   function afficherDonnees(d) {
     etat.boutique = d.boutique || {}; etat.produits = d.produits || []; etat.annonces = d.annonces || [];
     etat.parId = {}; etat.produits.forEach(function (p) { if (p && p.id && p.nom && p.images && p.images.length) etat.parId[p.id] = p; });
+    construireCodes();
     var valides = Object.keys(etat.parId).map(function (k) { return etat.parId[k]; });
     // Ordre : mélangé à chaque chargement, sauf si le développeur a désactivé le mélange dans Supabase (boutique.melange_actif = false)
     if (etat.boutique.melange_actif === false) {
@@ -419,8 +466,8 @@
     appliquerBoutique(etat.boutique); construireBande(etat.annonces); construirePied(etat.boutique);
     synchroniserPanier();
     afficherGrille();
-    var id = new URLSearchParams(location.search).get('p');       // lien de partage : on ouvre directement le produit
-    if (id && etat.parId[id]) ouvrirProduit(id, false);
+    var id = idDansUrl();                                         // lien de partage : on ouvre directement le produit
+    if (id) ouvrirProduit(id, false);
     mesurerHaut();
   }
 
@@ -441,6 +488,7 @@
     $('cart-icon').appendChild(NB.icon('cart', 22));
     $('all-icon').appendChild(NB.icon('grid', 18));
     $('wa-icon').appendChild(NB.icon('whatsapp', 20));
+    $('geo-icon').appendChild(NB.icon('pin', 18)); $('geo-btn').onclick = obtenirPosition;
     $('cart-close').appendChild(NB.icon('close', 18));
     chargerPanier(); majBadge();
 
@@ -466,6 +514,7 @@
       e.preventDefault(); ouvrirProduit(a.getAttribute('data-id'), true);
     });
     window.addEventListener('popstate', surNavigation);
+    window.addEventListener('hashchange', function () { if (etat.parCode) surNavigation(); });
     window.addEventListener('resize', mesurerHaut);
     if ('ResizeObserver' in window) new ResizeObserver(mesurerHaut).observe($('top-fixed'));
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
