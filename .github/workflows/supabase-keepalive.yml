@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Garde le(s) projet(s) Supabase actif(s) : évite la mise en pause après 7 jours d'inactivité (offre gratuite).
+#  Emplacement dans votre dépôt GitHub :  .github/workflows/supabase-keepalive.yml
+#  Il interroge la base (une vraie requête de lecture) tous les 3 jours, à 06h17 UTC.
+# ─────────────────────────────────────────────────────────────────────────────
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'      # tous les 3 jours (heure UTC)
+  workflow_dispatch:            # bouton « Run workflow » pour tester à la main
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false          # si un projet échoue, l'autre est quand même pingé
+      matrix:
+        projet:
+          - { nom: 'Nya-Market',   url: 'SUPABASE_URL_MARKET',   cle: 'SUPABASE_KEY_MARKET',   table: 'vendeurs' }
+          - { nom: 'Nya-Boutique', url: 'SUPABASE_URL_BOUTIQUE', cle: 'SUPABASE_KEY_BOUTIQUE', table: 'boutique' }
+          # Retirez la ligne d'un projet que vous n'utilisez pas.
+    steps:
+      - name: Ping ${{ matrix.projet.nom }}
+        env:
+          URL_NAME: ${{ matrix.projet.url }}
+          KEY_NAME: ${{ matrix.projet.cle }}
+          SB_URL_MARKET: ${{ secrets.SUPABASE_URL_MARKET }}
+          SB_KEY_MARKET: ${{ secrets.SUPABASE_KEY_MARKET }}
+          SB_URL_BOUTIQUE: ${{ secrets.SUPABASE_URL_BOUTIQUE }}
+          SB_KEY_BOUTIQUE: ${{ secrets.SUPABASE_KEY_BOUTIQUE }}
+          TABLE: ${{ matrix.projet.table }}
+        run: |
+          set -euo pipefail
+          if [ "$URL_NAME" = "SUPABASE_URL_MARKET" ]; then URL="$SB_URL_MARKET"; KEY="$SB_KEY_MARKET"; else URL="$SB_URL_BOUTIQUE"; KEY="$SB_KEY_BOUTIQUE"; fi
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "::error::Secrets manquants pour ce projet (voir le guide)."; exit 1; fi
+          URL="${URL%/}"
+          # Requête de lecture : 1 ligne, clé publique (la même que dans config.js)
+          CODE=$(curl -sS -o /tmp/rep.json -w '%{http_code}' --max-time 30 --retry 3 --retry-delay 10 \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/$TABLE?select=*&limit=1")
+          echo "Réponse HTTP : $CODE"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 300 ]; then
+            echo "::error::Échec ($CODE). Réponse :"; head -c 400 /tmp/rep.json; echo; exit 1
+          fi
+          echo "✅ Projet actif."
