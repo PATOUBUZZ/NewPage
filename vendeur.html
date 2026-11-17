@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Espace vendeur</title>
+  <title>Espace vendeur · V2</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0B1F4D">
 
@@ -161,6 +161,28 @@
       </div>
       <p class="text-xs text-slate-500 -mt-1 mb-3">Messages qui défilent tout en haut de votre site (10 maximum).</p>
       <div id="ann-list" class="space-y-2" aria-live="polite"></div>
+
+      <!-- ═════ V2 : IMAGE DE COUVERTURE (arrière-plan de l'en-tête du site) ═════ -->
+      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-image text-deal"></i> Image de couverture</h3>
+      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
+        <!-- Aperçu fidèle de l'en-tête du site : image + filtre sombre + nom + panier -->
+        <div class="cover-preview" id="cover-preview">
+          <img id="cover-img" class="hidden" alt="Aperçu de l'image de couverture">
+          <div class="cover-shade" aria-hidden="true"></div>
+          <p id="cover-empty" class="cover-empty">Aucune image : le site affiche le dégradé de la couleur de votre boutique.</p>
+          <div class="cover-bar" aria-hidden="true">
+            <span id="cover-preview-name" class="cover-name">Ma boutique</span>
+            <span class="cover-cart"><i class="fas fa-shopping-cart"></i></span>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mt-3">Cette image s'affiche en arrière-plan de l'en-tête de votre site (20 % de la hauteur de l'écran). Un filtre sombre est ajouté automatiquement pour que le nom et le panier restent lisibles. Choisissez une image <strong>large</strong> (paysage) ; elle est allégée automatiquement.</p>
+        <input id="f-cover" type="file" accept="image/*" class="hidden">
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <label for="f-cover" class="action-btn" id="btn-cover-choose"><i class="fas fa-camera"></i> <span id="btn-cover-label">Choisir une image</span></label>
+          <button id="btn-cover-remove" type="button" class="action-btn action-btn-ghost disabled:opacity-50"><i class="fas fa-trash"></i> Retirer</button>
+        </div>
+        <p id="cover-error" class="form-error hidden mt-3" role="alert"></p>
+      </div>
 
       <!-- Informations de la boutique -->
       <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-info-circle text-deal"></i> Informations de la boutique</h3>

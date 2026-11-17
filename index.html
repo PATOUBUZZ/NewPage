@@ -14,22 +14,34 @@
 </head>
 <body>
 
-  <!-- ═════ ZONE FIXE : bande défilante (tout en haut) + en-tête (logo, nom, panier) ═════ -->
+  <!-- ═════ ZONE FIXE (V2) : en-tête de 20vh avec l'IMAGE DE COUVERTURE du vendeur en arrière-plan ═════
+       Empilement, de bas en haut :
+         1) dégradé de la couleur de la boutique (affiché si le vendeur n'a pas encore choisi de couverture)
+         2) image de couverture (injectée par app.js depuis boutique.cover_url)
+         3) filtre sombre en dégradé  → le texte et l'icône du panier restent lisibles quelle que soit l'image
+         4) premier plan : bande défilante (annonces), logo + nom de la boutique, panier
+       La hauteur est fixée à 20vh (1,2 sur 6 de l'écran) dans style.css (.site-header). -->
   <div class="top-fixed" id="top-fixed">
-    <!-- Bande défilante infinie : remplie par app.js à partir de la table « annonces » (masquée s'il n'y a aucun message) -->
-    <div class="ticker" id="ticker" hidden aria-label="Annonces de la boutique">
-      <div class="ticker-track" id="ticker-track"></div>
-    </div>
+    <header class="site-header" id="site-header">
+      <div class="header-cover" id="header-cover" aria-hidden="true"></div>
+      <div class="header-shade" aria-hidden="true"></div>
 
-    <header class="site-header">
-      <a class="brand" id="brand-link" href="./" aria-label="Retour à tous les produits">
-        <span class="brand-logo" id="brand-logo" aria-hidden="true"></span>
-        <span class="brand-name" id="brand-name">Boutique</span>
-      </a>
-      <button class="cart-btn" id="cart-btn" type="button" aria-label="Ouvrir le panier">
-        <span id="cart-icon"></span>
-        <span class="cart-badge" id="cart-count" hidden>0</span>
-      </button>
+      <!-- Bande défilante infinie : remplie par app.js à partir de la table « annonces » (masquée s'il n'y a aucun message) -->
+      <div class="ticker" id="ticker" hidden aria-label="Annonces de la boutique">
+        <div class="ticker-track" id="ticker-track"></div>
+      </div>
+
+      <!-- Nom de la boutique (gauche) + panier (droite), superposés à l'image -->
+      <div class="header-bar">
+        <a class="brand" id="brand-link" href="./" aria-label="Retour à tous les produits">
+          <span class="brand-logo" id="brand-logo" aria-hidden="true"></span>
+          <span class="brand-name" id="brand-name">Boutique</span>
+        </a>
+        <button class="cart-btn" id="cart-btn" type="button" aria-label="Ouvrir le panier">
+          <span id="cart-icon"></span>
+          <span class="cart-badge" id="cart-count" hidden>0</span>
+        </button>
+      </div>
     </header>
   </div>
 
