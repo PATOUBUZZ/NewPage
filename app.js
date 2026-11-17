@@ -402,32 +402,8 @@
     if (dernierFocus && dernierFocus.focus) dernierFocus.focus();
   }
 
-  /* V3 — La commande est ENREGISTRÉE dans Supabase (table « commandes ») : le vendeur est notifié instantanément (Telegram / webhook,
-     réglés côté base). On n'envoie que l'identifiant + la quantité de chaque produit : la base recalcule noms, prix et total.
-     WhatsApp reste proposé ensuite (confirmation au client). Si l'enregistrement est impossible (réseau, base pas à jour),
-     on bascule sur WhatsApp seul : aucune vente n'est perdue. */
-  function nouvelUuid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
-  }
-  function enregistrerCommande(ligne) {
-    return fetch(cfg.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/commandes', {
-      method: 'POST',
-      headers: Object.assign({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }, entetes()),
-      body: JSON.stringify(ligne)
-    }).then(function (r) {
-      if (r.ok) return { ok: true };
-      return r.json().catch(function () { return {}; }).then(function (j) {
-        // 4xx (sauf 404 = table absente) : le serveur refuse la commande, son message (en français) est montré au client
-        if (r.status >= 400 && r.status < 500 && r.status !== 404 && r.status !== 401 && r.status !== 403 && j && j.message && !/^(permission|new row|invalid input|null value)/i.test(j.message)) return { ok: false, refus: j.message };
-        return { ok: false };
-      });
-    }).catch(function () { return { ok: false }; });
-  }
-
   function envoyerCommande(e) {
     e.preventDefault();
-    if (etat.envoiEnCours) return;
     var err = $('order-error'); err.hidden = true;
     var nom = $('o-nom').value.trim(), tel = $('o-tel').value.trim(), adr = $('o-adresse').value.trim(), note = $('o-note').value.trim();
     var gps = etat.position;
@@ -436,55 +412,26 @@
     if (nom.length < 2) return erreur('Indiquez votre nom.');
     if (adr.length < 3 && !gps) return erreur('Indiquez votre quartier ou adresse de livraison (ou touchez « Utiliser ma position »).');
     var num = NB.chiffres(etat.boutique.whatsapp);
+    if (!num) return erreur('Le vendeur n’a pas encore renseigné son numéro WhatsApp.');
 
-    var id = nouvelUuid(), ref = id.replace(/-/g, '').slice(0, 6).toUpperCase();
-    var lignesPanier = etat.panier.slice();
-    var totalCommande = total();
-    function messageWhatsApp(avecRef) {
-      var lignes = ['🛒 *Nouvelle commande' + (avecRef ? ' #' + ref : '') + ' — ' + (etat.boutique.nom || 'Boutique') + '*', ''];
-      lignesPanier.forEach(function (i, k) {
-        lignes.push((k + 1) + '. ' + i.nom + ' × ' + i.qte + ' — ' + NB.prix(i.prix * i.qte));
-        lignes.push('   ' + lienProduit(i.id));
-      });
-      lignes.push('', '*Total : ' + NB.prix(totalCommande) + '*', '', '👤 ' + nom);
-      if (tel) lignes.push('📞 ' + tel);
-      if (adr) lignes.push('📍 ' + adr);
-      if (gps) lignes.push('🧭 Position GPS (±' + gps.precision + ' m) : https://www.google.com/maps?q=' + gps.lat + ',' + gps.lng);
-      if (note) lignes.push('📝 ' + note);
-      lignes.push('', 'Paiement à la livraison.');
-      return 'https://wa.me/' + num + '?text=' + encodeURIComponent(lignes.join('\n'));
-    }
-
-    // Fenêtre WhatsApp ouverte TOUT DE SUITE (pendant le clic) : sinon le navigateur bloque l'ouverture après l'attente réseau.
-    var fen = null;
-    if (num) { try { fen = window.open('', '_blank'); } catch (x) { fen = null; } }
-    function ouvrirWhatsApp(avecRef) {
-      if (!num) return;
-      var url = messageWhatsApp(avecRef);
-      if (fen && !fen.closed) { try { fen.opener = null; } catch (x) { /* sans gravité */ } fen.location.href = url; }
-      else location.href = url;                               // fenêtre bloquée : on ouvre dans le même onglet
-    }
-    function terminer(msg) {
-      etat.panier = []; sauverPanier(); fermerPanier(); toast(msg);
-      $('order-form').reset(); retirerPosition();
-    }
-
-    etat.envoiEnCours = true;
-    var btn = $('order-submit'), libelle = btn.innerHTML; btn.disabled = true; btn.textContent = 'Envoi de la commande…';
-    enregistrerCommande({
-      id: id, client_nom: nom, client_tel: tel, adresse: adr, note: note,
-      gps_lat: gps ? Number(gps.lat) : null, gps_lng: gps ? Number(gps.lng) : null, gps_precision: gps ? gps.precision : null,
-      articles: lignesPanier.map(function (i) { return { id: i.id, qte: i.qte }; })
-    }).then(function (r) {
-      etat.envoiEnCours = false; btn.disabled = false; btn.innerHTML = libelle;
-      if (r.refus) {                                           // commande refusée par le serveur : on garde le panier et on explique
-        if (fen && !fen.closed) fen.close();
-        return erreur(r.refus);
-      }
-      if (r.ok) { ouvrirWhatsApp(true); terminer('Commande #' + ref + ' enregistrée ✓' + (num ? ' Confirmez-la dans WhatsApp.' : '')); }
-      else if (num) { ouvrirWhatsApp(false); terminer('Commande prête : validez l’envoi dans WhatsApp ✓'); }
-      else { erreur('Commande impossible pour le moment : vérifiez votre connexion et réessayez.'); }
+    var lignes = ['🛒 *Nouvelle commande — ' + (etat.boutique.nom || 'Boutique') + '*', ''];
+    etat.panier.forEach(function (i, k) {
+      lignes.push((k + 1) + '. ' + i.nom + ' × ' + i.qte + ' — ' + NB.prix(i.prix * i.qte));
+      lignes.push('   ' + lienProduit(i.id));
     });
+    lignes.push('', '*Total : ' + NB.prix(total()) + '*', '', '👤 ' + nom);
+    if (tel) lignes.push('📞 ' + tel);
+    if (adr) lignes.push('📍 ' + adr);
+    if (gps) lignes.push('🧭 Position GPS (±' + gps.precision + ' m) : https://www.google.com/maps?q=' + gps.lat + ',' + gps.lng);
+    if (note) lignes.push('📝 ' + note);
+    lignes.push('', 'Paiement à la livraison.');
+
+    var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(lignes.join('\n'));
+    var w = window.open(url, '_blank');                       // (pas de « noopener » ici : il ferait renvoyer null même quand la fenêtre s'ouvre)
+    if (w) { try { w.opener = null; } catch (err) { /* sans gravité */ } }
+    else location.href = url;                                 // fenêtre bloquée : on ouvre dans le même onglet
+    etat.panier = []; sauverPanier(); fermerPanier(); toast('Commande prête : validez l’envoi dans WhatsApp ✓');
+    $('order-form').reset(); retirerPosition();
   }
 
   /* ───────────────────────────── Position GPS du client (facultative) ─────────────────────────────

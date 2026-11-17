@@ -157,21 +157,3 @@ textarea.field { min-height: 0; resize: vertical; }
 /* Photo principale / déplacement */
 .photo-main { position: absolute; bottom: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: rgba(37,99,235,.9); color: #fff; border: 0; font-size: .7rem; cursor: pointer; }
 .photo-tag { position: absolute; bottom: 3px; left: 3px; font-size: .6rem; font-weight: 800; color: #fff; background: rgba(249,115,22,.95); border-radius: 999px; padding: 1px 7px; }
-
-/* ===== V3 : commandes ===== */
-.cmd-filter { min-height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid #E2E8F0; background: #fff; color: #475569; font-weight: 700; font-size: .85rem; cursor: pointer; }
-.cmd-filter.active { background: #0B1F4D; color: #fff; border-color: #0B1F4D; }
-.cmd-card { background: #fff; border: 1px solid #E6EAF2; border-left: 5px solid #F97316; border-radius: 16px; padding: 14px; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
-.cmd-card.st-confirmee { border-left-color: #2563EB; }
-.cmd-card.st-livree { border-left-color: #10B981; }
-.cmd-card.st-annulee { border-left-color: #94A3B8; opacity: .8; }
-.cmd-ref { font-weight: 800; color: #0B1F4D; }
-.cmd-items { margin: 8px 0; padding: 8px 10px; background: #F8FAFC; border-radius: 10px; font-size: .85rem; }
-.cmd-items li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
-.cmd-total { font-weight: 800; color: #F97316; }
-.badge-st { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800; }
-.badge-st.nouvelle { background: #FFEDD5; color: #C2410C; }
-.badge-st.confirmee { background: #DBEAFE; color: #1D4ED8; }
-.badge-st.livree { background: #D1FAE5; color: #047857; }
-.badge-st.annulee { background: #E2E8F0; color: #475569; }
-.cmd-link { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: .82rem; color: #2563EB; text-decoration: underline; }
