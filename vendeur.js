@@ -26,7 +26,7 @@
   var QUALITE_MIN = 0.72;                      // en dessous, on préfère réduire un peu les dimensions
 
   var sb = null;
-  var S = { session: null, boutique: {}, produits: [], annonces: [], photos: [], editId: null, editAnn: null, chargeUne: false, dernierRefresh: 0 };
+  var S = { session: null, boutique: {}, produits: [], annonces: [], commandes: [], cmdIndispo: false, cmdFiltre: 'nouvelle', photos: [], editId: null, editAnn: null, chargeUne: false, dernierRefresh: 0 };
 
   /* ───────────────────────────── Utilitaires ───────────────────────────── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -207,16 +207,19 @@
     return Promise.all([
       sb.from('boutique').select('*').eq('id', 1).maybeSingle(),
       sb.from('produits').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: false }),
-      sb.from('annonces').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true })
+      sb.from('annonces').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true }),
+      // V3 : si la table « commandes » n'existe pas encore (script 5 non lancé), le tableau de bord reste utilisable
+      sb.from('commandes').select('*').order('cree_le', { ascending: false }).limit(100).then(function (x) { return x; }, function (e) { return { error: e }; })
     ]).then(function (r) {
-      for (var i = 0; i < r.length; i++) if (r[i].error) throw r[i].error;
+      for (var i = 0; i < 3; i++) if (r[i].error) throw r[i].error;
       S.boutique = r[0].data || {}; S.produits = r[1].data || []; S.annonces = r[2].data || [];
+      S.cmdIndispo = !!r[3].error; S.commandes = r[3].error ? [] : (r[3].data || []);
       S.chargeUne = true;
       dessinerTout();
     });
   }
 
-  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerAnnonces(); majContacts(); }
+  function dessinerTout() { dessinerBoutique(); dessinerCommandes(); dessinerProduits(); dessinerAnnonces(); majContacts(); }
 
   /* ───────────────────────────── Carte boutique ───────────────────────────── */
   function urlBoutique() { return location.origin + location.pathname.replace(/[^\/]*$/, ''); }
@@ -359,6 +362,59 @@
       .then(function () { invaliderCache(); return chargerTout(); })
       .then(function () { toast('Image de couverture retirée.'); })
       .catch(function (e) { erreur('cover-error', 'Échec : ' + messageErreur(e)); }).then(function () { occupe(false); });
+  }
+
+  /* ───────────────────────────── V3 : commandes reçues ───────────────────────────── */
+  var LIBELLE_ST = { nouvelle: 'Nouvelle', confirmee: 'Confirmée', livree: 'Livrée', annulee: 'Annulée' };
+  function dateFr(iso) {
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+  function dessinerCommandes() {
+    var liste = $('cmd-list'), nbNouv = S.commandes.filter(function (c) { return c.statut === 'nouvelle'; }).length;
+    var b = $('cmd-new'); b.textContent = nbNouv + ' nouvelle' + (nbNouv > 1 ? 's' : ''); b.classList.toggle('hidden', !nbNouv);
+    Array.prototype.forEach.call(document.querySelectorAll('.cmd-filter'), function (f) { f.classList.toggle('active', f.dataset.f === S.cmdFiltre); });
+    if (S.cmdIndispo) { liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><i class="fas fa-triangle-exclamation mr-1"></i> Les commandes ne sont pas encore activées : lancez <strong>SQL/5-v3-commandes.sql</strong> dans Supabase.</p>'; return; }
+    var vues = S.commandes.filter(function (c) { return S.cmdFiltre === 'toutes' || c.statut === 'nouvelle'; });
+    if (!vues.length) { liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">' + (S.cmdFiltre === 'toutes' ? 'Aucune commande pour le moment.' : 'Aucune commande à traiter 🎉') + '</p>'; return; }
+    liste.innerHTML = vues.map(function (c) {
+      var tel = NB.chiffres(c.client_tel), arts = Array.isArray(c.articles) ? c.articles : [];
+      var carte = (c.gps_lat != null && c.gps_lng != null) ? 'https://www.google.com/maps?q=' + encodeURIComponent(c.gps_lat + ',' + c.gps_lng) : '';
+      var notif = c.notif_envoyee ? '<span title="Notification envoyée" class="text-xs text-slate-400"><i class="fas fa-bell"></i></span>' : (c.notif_info ? '<span title="' + esc(c.notif_info) + '" class="text-xs text-red-500"><i class="fas fa-bell-slash"></i></span>' : '');
+      var act = '';
+      if (c.statut === 'nouvelle') act += '<button type="button" class="prod-act prod-edit" data-cs="confirmee"><i class="fas fa-check"></i> Confirmer</button>';
+      if (c.statut === 'nouvelle' || c.statut === 'confirmee') act += '<button type="button" class="prod-act prod-edit" data-cs="livree"><i class="fas fa-truck"></i> Livrée</button>';
+      if (c.statut !== 'annulee' && c.statut !== 'livree') act += '<button type="button" class="prod-act prod-hide" data-cs="annulee"><i class="fas fa-ban"></i> Annuler</button>';
+      if (c.statut === 'annulee' || c.statut === 'livree') act += '<button type="button" class="prod-act prod-hide" data-cs="nouvelle"><i class="fas fa-rotate-left"></i> Remettre à traiter</button>';
+      act += '<button type="button" class="prod-act prod-del" data-cs="supprimer"><i class="fas fa-trash"></i></button>';
+      return '<article class="cmd-card st-' + esc(c.statut) + '" data-id="' + esc(c.id) + '">' +
+        '<div class="flex items-start justify-between gap-2"><div><span class="cmd-ref">#' + esc(c.ref) + '</span> <span class="text-xs text-slate-500">' + esc(dateFr(c.cree_le)) + '</span> ' + notif + '</div>' +
+        '<span class="badge-st ' + esc(c.statut) + '">' + esc(LIBELLE_ST[c.statut] || c.statut) + '</span></div>' +
+        '<p class="mt-1 font-bold text-slate-900">' + esc(c.client_nom) + '</p>' +
+        '<div class="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm">' +
+          (c.client_tel ? '<span>📞 ' + esc(c.client_tel) + '</span>' : '') +
+          (tel ? '<a class="cmd-link" target="_blank" rel="noopener" href="https://wa.me/' + esc(tel) + '"><i class="fab fa-whatsapp"></i> WhatsApp client</a>' : '') +
+          (c.client_tel ? '<a class="cmd-link" href="tel:' + esc(c.client_tel.replace(/[^0-9+]/g, '')) + '"><i class="fas fa-phone"></i> Appeler</a>' : '') +
+        '</div>' +
+        (c.adresse ? '<p class="mt-1 text-sm">📍 ' + esc(c.adresse) + '</p>' : '') +
+        (carte ? '<p class="mt-1 text-sm"><a class="cmd-link" target="_blank" rel="noopener" href="' + esc(carte) + '"><i class="fas fa-location-dot"></i> Position GPS du client (±' + esc(c.gps_precision || 0) + ' m)</a></p>' : '') +
+        (c.note ? '<p class="mt-1 text-sm text-slate-600">📝 ' + esc(c.note) + '</p>' : '') +
+        '<ul class="cmd-items">' + arts.map(function (a) { return '<li><span>' + esc(a.qte) + ' × ' + esc(a.nom) + '</span><span>' + esc(fcfa(a.prix * a.qte)) + '</span></li>'; }).join('') + '</ul>' +
+        '<p class="text-right">Total : <span class="cmd-total">' + esc(fcfa(c.total)) + '</span></p>' +
+        '<div class="flex flex-wrap gap-2 mt-3">' + act + '</div></article>';
+    }).join('');
+  }
+  function clicCommande(e) {
+    var b = e.target.closest('[data-cs]'); if (!b) return;
+    var id = b.closest('.cmd-card').dataset.id, act = b.dataset.cs;
+    if (act === 'supprimer') {
+      if (!window.confirm('Supprimer définitivement cette commande ?')) return;
+      return executer(sb.from('commandes').delete().eq('id', id).select(), 'Commande supprimée.');
+    }
+    executer(sb.from('commandes').update({ statut: act }).eq('id', id).select().single(), 'Commande : ' + (LIBELLE_ST[act] || act).toLowerCase() + ' ✓');
+  }
+  function actualiserCommandes(silencieux) {
+    return chargerTout().then(function () { if (!silencieux) toast('Commandes actualisées'); }).catch(function (e) { if (!silencieux) toast(messageErreur(e)); });
   }
 
   /* ───────────────────────────── Produits : liste ───────────────────────────── */
@@ -633,6 +689,15 @@
     $('form-shop').addEventListener('submit', enregistrerInfos);
     $('cover-file').addEventListener('change', function (e) { choisirCouverture(e.target.files && e.target.files[0]); });
     $('btn-cover-del').onclick = retirerCouverture;
+    $('cmd-list').addEventListener('click', clicCommande);
+    $('btn-cmd-refresh').onclick = function () { actualiserCommandes(false); };
+    Array.prototype.forEach.call(document.querySelectorAll('.cmd-filter'), function (f) { f.onclick = function () { S.cmdFiltre = f.dataset.f; dessinerCommandes(); }; });
+    // Nouvelles commandes : actualisation automatique toutes les 60 s (page visible, aucune fenêtre ouverte)
+    setInterval(function () {
+      if (!S.chargeUne || document.visibilityState !== 'visible' || document.querySelector('.modal-overlay:not(.hidden)')) return;
+      var avant = S.commandes.filter(function (c) { return c.statut === 'nouvelle'; }).length;
+      chargerTout().then(function () { var apres = S.commandes.filter(function (c) { return c.statut === 'nouvelle'; }).length; if (apres > avant) toast('🔔 Nouvelle commande reçue !'); }).catch(function () { });
+    }, 60000);
     $('btn-copy-link').onclick = copierLien;
     $('btn-share-link').onclick = partagerLien;
 

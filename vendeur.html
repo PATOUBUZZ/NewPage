@@ -148,6 +148,17 @@
         </div>
       </div>
 
+      <!-- V3 : commandes reçues -->
+      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
+        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-receipt text-deal"></i> Commandes <span id="cmd-new" class="hidden text-xs font-bold text-white bg-red-600 rounded-full px-2 py-0.5"></span></h3>
+        <button id="btn-cmd-refresh" type="button" class="prod-act prod-hide"><i class="fas fa-rotate"></i> Actualiser</button>
+      </div>
+      <div class="flex gap-2 mb-3" role="tablist" aria-label="Filtrer les commandes">
+        <button id="cmd-f-new" type="button" class="cmd-filter active" data-f="nouvelle">À traiter</button>
+        <button id="cmd-f-all" type="button" class="cmd-filter" data-f="toutes">Toutes</button>
+      </div>
+      <div id="cmd-list" class="space-y-3" aria-live="polite"></div>
+
       <!-- Liste des produits -->
       <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2">
         <i class="fas fa-box-open text-deal"></i> Mes produits
