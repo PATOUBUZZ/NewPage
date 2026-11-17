@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Espace vendeur · V4</title>
+  <title>Espace vendeur</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0B1F4D">
 
@@ -52,7 +52,7 @@
     </div>
   </header>
 
-  <main class="max-w-3xl mx-auto px-4 pt-5 pb-40">
+  <main class="max-w-3xl lg:max-w-5xl mx-auto px-4 pt-5 pb-40">
 
     <!-- ===== VUE 1 : CONNEXION ===== -->
     <section id="view-landing" class="hidden">
@@ -81,7 +81,7 @@
 
           <ul class="mt-6 space-y-3 text-sm text-slate-600">
             <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Vos produits sont publiés immédiatement, sans validation</li>
-            <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Accès réservé aux administrateurs de la boutique (5 maximum), chacun avec son propre compte Google</li>
+            <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Accès réservé au Gmail du propriétaire</li>
             <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Vos clients commandent directement sur WhatsApp</li>
           </ul>
         </div>
@@ -93,8 +93,8 @@
       <div class="rounded-3xl bg-white border border-slate-200 shadow-xl p-7 text-center">
         <div class="mx-auto w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-2xl mb-4"><i class="fas fa-lock"></i></div>
         <h2 class="text-lg font-extrabold text-brand-navy">Accès refusé</h2>
-        <p class="mt-2 text-sm text-slate-600">Le compte <strong id="denied-email" class="break-all"></strong> n'est pas autorisé à gérer cette boutique (ou son accès a été désactivé).</p>
-        <p class="mt-2 text-xs text-slate-500">Connectez-vous avec le Gmail communiqué au développeur, ou demandez à l'administrateur principal de vous ajouter dans la section « Administrateurs ».</p>
+        <p class="mt-2 text-sm text-slate-600">Le compte <strong id="denied-email" class="break-all"></strong> n'est pas autorisé à gérer cette boutique.</p>
+        <p class="mt-2 text-xs text-slate-500">Connectez-vous avec l'adresse Gmail communiquée au développeur lors de la mise en place de votre boutique.</p>
         <button id="btn-denied-out" type="button" class="btn-main mt-5"><i class="fas fa-user-friends mr-2"></i> Changer de compte</button>
       </div>
     </section>
@@ -111,7 +111,6 @@
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ma boutique</p>
               <h2 id="shop-name" class="text-xl font-extrabold text-brand-navy truncate">—</h2>
               <p id="shop-account-status" class="mt-1"></p>
-              <p id="me-badge" class="mt-1 text-xs font-semibold text-slate-600"></p>
               <p class="mt-1 text-sm text-slate-600 flex items-center gap-1 flex-wrap">
                 <i class="fas fa-map-marker-alt text-brand"></i>
                 <span id="shop-location" class="min-w-0 break-words"></span>
@@ -153,22 +152,7 @@
       <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2">
         <i class="fas fa-box-open text-deal"></i> Mes produits
       </h3>
-      <div id="products-list" class="space-y-3" aria-live="polite"></div>
-
-      <!-- ═════ V3 : COMMANDES REÇUES ═════ -->
-      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
-        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-receipt text-deal"></i> Commandes reçues <span id="cmd-count" class="text-xs font-bold text-orange-600"></span></h3>
-      </div>
-      <p class="text-xs text-slate-500 -mt-1 mb-3">Chaque commande validée par un client est enregistrée ici (les 30 dernières) et vous est aussi envoyée par Telegram / webhook si vous l'avez configuré plus bas.</p>
-      <div id="cmd-list" class="space-y-2" aria-live="polite"></div>
-
-      <!-- ═════ V3 : CARROUSEL PROMOTIONNEL ═════ -->
-      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
-        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-images text-deal"></i> Carrousel promotionnel <span id="slide-count" class="text-xs font-bold text-slate-400"></span></h3>
-        <button id="btn-add-slide" type="button" class="prod-act prod-edit disabled:opacity-50"><i class="fas fa-plus"></i> Ajouter</button>
-      </div>
-      <p class="text-xs text-slate-500 -mt-1 mb-3">3 diapositives maximum (image + titre + texte + lien de redirection). Elles défilent en boucle sous l'en-tête de votre site pour mettre vos promotions en avant.</p>
-      <div id="slide-list" class="space-y-2" aria-live="polite"></div>
+      <div id="products-list" class="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3" aria-live="polite"></div>
 
       <!-- Bande défilante -->
       <div class="mt-7 mb-3 flex items-center justify-between gap-2">
@@ -177,53 +161,6 @@
       </div>
       <p class="text-xs text-slate-500 -mt-1 mb-3">Messages qui défilent tout en haut de votre site (10 maximum).</p>
       <div id="ann-list" class="space-y-2" aria-live="polite"></div>
-
-      <!-- ═════ V2 : IMAGE DE COUVERTURE (arrière-plan de l'en-tête du site) ═════ -->
-      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-image text-deal"></i> Image de couverture</h3>
-      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
-        <!-- Aperçu fidèle de l'en-tête du site : image + filtre sombre + nom + panier -->
-        <div class="cover-preview" id="cover-preview">
-          <img id="cover-img" class="hidden" alt="Aperçu de l'image de couverture">
-          <div class="cover-shade" aria-hidden="true"></div>
-          <p id="cover-empty" class="cover-empty">Aucune image : le site affiche le dégradé de la couleur de votre boutique.</p>
-          <div class="cover-bar" aria-hidden="true">
-            <span id="cover-preview-name" class="cover-name">Ma boutique</span>
-            <span class="cover-cart"><i class="fas fa-shopping-cart"></i></span>
-          </div>
-        </div>
-        <p class="text-xs text-slate-500 mt-3">Cette image s'affiche en arrière-plan de l'en-tête de votre site (20 % de la hauteur de l'écran). Un filtre sombre est ajouté automatiquement pour que le nom et le panier restent lisibles. Choisissez une image <strong>large</strong> (paysage) ; elle est allégée automatiquement.</p>
-        <input id="f-cover" type="file" accept="image/*" class="hidden">
-        <div class="grid grid-cols-2 gap-2 mt-3">
-          <label for="f-cover" class="action-btn" id="btn-cover-choose"><i class="fas fa-camera"></i> <span id="btn-cover-label">Choisir une image</span></label>
-          <button id="btn-cover-remove" type="button" class="action-btn action-btn-ghost disabled:opacity-50"><i class="fas fa-trash"></i> Retirer</button>
-        </div>
-        <p id="cover-error" class="form-error hidden mt-3" role="alert"></p>
-      </div>
-
-      <!-- ═════ V3 : NOTIFICATIONS DE COMMANDES (Telegram / webhook) ═════ -->
-      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-bell text-deal"></i> Notifications de commandes</h3>
-      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-sm">
-        <dl class="space-y-2">
-          <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Telegram</dt><dd id="ns-tg" class="min-w-0 break-words">—</dd></div>
-          <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Webhook</dt><dd id="ns-wh" class="min-w-0 break-words">—</dd></div>
-          <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Envoi</dt><dd id="ns-actif" class="min-w-0 break-words">—</dd></div>
-        </dl>
-        <p id="notif-warn" class="form-error hidden mt-3"></p>
-        <p class="text-xs text-slate-500 mt-3">Pour recevoir les commandes sur <strong>votre</strong> Telegram : ouvrez le bot, envoyez-lui <strong>/start</strong>, puis ajoutez votre Chat ID dans « Administrateurs → Modifier ».</p>
-        <div class="grid grid-cols-2 gap-2 mt-4">
-          <button id="btn-notif-edit" type="button" class="action-btn"><i class="fas fa-cog"></i> Configurer</button>
-          <button id="btn-notif-test" type="button" class="action-btn action-btn-ghost"><i class="fas fa-paper-plane"></i> Envoyer un test</button>
-        </div>
-        <p id="notif-test-result" class="hidden mt-3 text-sm font-semibold whitespace-pre-line break-words"></p>
-      </div>
-
-      <!-- ═════ V4 : ADMINISTRATEURS (5 profils maximum) ═════ -->
-      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
-        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-users-cog text-deal"></i> Administrateurs <span id="adm-count" class="text-xs font-bold text-slate-400"></span></h3>
-        <button id="btn-add-admin" type="button" class="prod-act prod-edit disabled:opacity-50 hidden"><i class="fas fa-user-plus"></i> Ajouter</button>
-      </div>
-      <p class="text-xs text-slate-500 -mt-1 mb-3">Jusqu'à 5 profils pilotent la boutique, chacun avec son propre compte Google. <span id="adm-rule"></span></p>
-      <div id="adm-list" class="space-y-2" aria-live="polite"></div>
 
       <!-- Informations de la boutique -->
       <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-info-circle text-deal"></i> Informations de la boutique</h3>
@@ -234,6 +171,25 @@
           <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Description</dt><dd id="i-desc" class="min-w-0 break-words whitespace-pre-line"></dd></div>
         </dl>
         <button id="btn-edit-shop" type="button" class="action-btn mt-4"><i class="fas fa-pen"></i> Modifier les informations</button>
+      </div>
+
+      <!-- V2 : image de couverture de l'en-tête -->
+      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-image text-deal"></i> Image de couverture (en-tête)</h3>
+      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-sm">
+        <div id="cover-prev" class="relative w-full h-28 sm:h-36 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+          <span id="cover-empty"><i class="fas fa-image mr-1"></i> Aucune image : l'en-tête reste en dégradé bleu</span>
+          <img id="cover-img" class="hidden absolute inset-0 w-full h-full object-cover" alt="Couverture">
+          <div id="cover-overlay" class="hidden absolute inset-0 bg-gradient-to-b from-black/10 to-black/70 flex items-end justify-between p-3 text-white font-extrabold">
+            <span id="cover-name" class="truncate"></span><i class="fas fa-shopping-cart"></i>
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Image large conseillée (ex. 1600 × 400). Le nom de votre boutique et le panier s'affichent par-dessus. Elle est automatiquement allégée (WebP ≈ 130 Ko).</p>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <label for="cover-file" id="btn-cover-pick" class="action-btn cursor-pointer"><i class="fas fa-upload"></i> <span id="cover-pick-label">Choisir une image</span></label>
+          <button id="btn-cover-del" type="button" class="action-btn action-btn-ghost hidden"><i class="fas fa-trash"></i> Retirer</button>
+        </div>
+        <input id="cover-file" type="file" accept="image/*" class="hidden">
+        <p id="cover-error" class="form-error hidden mt-2"></p>
       </div>
 
       <!-- Information publication -->
@@ -401,131 +357,6 @@
         <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="a-visible" type="checkbox" class="w-5 h-5 accent-brand" checked> Affiché sur le site</label>
         <p id="ann-error" class="form-error hidden"></p>
         <button id="btn-ann-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===== V3 : MODALE : DIAPOSITIVE DU CARROUSEL ===== -->
-  <div id="modal-slide" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="slide-title">
-    <div class="modal-panel">
-      <button id="btn-slide-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
-      <h2 id="slide-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Nouvelle diapositive</h2>
-      <form id="form-slide" class="space-y-4 mt-4" novalidate>
-        <div>
-          <p class="field-label"><i class="fas fa-image"></i> Image <span class="font-normal text-slate-400">(facultative — sans image : dégradé de la couleur de la boutique)</span></p>
-          <!-- Aperçu fidèle : image + filtre sombre + texte -->
-          <div class="slide-preview">
-            <img id="slide-img" class="hidden" alt="Aperçu de l'image de la diapositive">
-            <div class="slide-shade" aria-hidden="true"></div>
-            <div class="slide-prev-text"><strong id="sp-titre">Votre titre</strong><span id="sp-texte">Votre texte promotionnel</span></div>
-          </div>
-          <input id="s-photo" type="file" accept="image/*" class="hidden">
-          <div class="grid grid-cols-2 gap-2 mt-2">
-            <label for="s-photo" class="action-btn"><i class="fas fa-camera"></i> <span id="btn-slide-img-label">Choisir une image</span></label>
-            <button id="btn-slide-img-remove" type="button" class="action-btn action-btn-ghost disabled:opacity-50"><i class="fas fa-trash"></i> Retirer</button>
-          </div>
-          <p class="text-xs text-slate-500 mt-1">Image large (paysage) recommandée. Elle est allégée automatiquement.</p>
-        </div>
-        <div>
-          <label class="field-label" for="s-titre">Titre <span id="s-titre-count" class="font-normal text-slate-400">0 / 60</span></label>
-          <input class="field" id="s-titre" type="text" maxlength="60" placeholder="Ex : 🔥 Soldes -30 % ce week-end">
-        </div>
-        <div>
-          <label class="field-label" for="s-texte">Texte <span id="s-texte-count" class="font-normal text-slate-400">0 / 140</span></label>
-          <textarea class="field" id="s-texte" rows="2" maxlength="140" placeholder="Ex : Livraison gratuite dès 2 articles"></textarea>
-        </div>
-        <div>
-          <label class="field-label" for="s-lien"><i class="fas fa-link"></i> Lien de redirection <span class="font-normal text-slate-400">(facultatif)</span></label>
-          <input class="field" id="s-lien" type="text" maxlength="500" placeholder="https://wa.me/22961000000 ou https://…">
-          <p class="text-xs text-slate-500 mt-1">Au toucher, le client est redirigé vers ce lien (WhatsApp, une page, un produit de la boutique…). Il doit commencer par https://</p>
-        </div>
-        <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="s-visible" type="checkbox" class="w-5 h-5 accent-brand" checked> Affichée sur le site</label>
-        <p id="slide-error" class="form-error hidden" role="alert"></p>
-        <button id="btn-slide-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===== V3 : MODALE : NOTIFICATIONS (Telegram / webhook) ===== -->
-  <div id="modal-notif" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="notif-title">
-    <div class="modal-panel">
-      <button id="btn-notif-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
-      <h2 id="notif-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Notifications de commandes</h2>
-      <form id="form-notif" class="space-y-4 mt-4" novalidate>
-        <div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900 leading-relaxed">
-          <p class="font-bold mb-1"><i class="fab fa-telegram mr-1"></i> Créer votre bot Telegram (2 minutes)</p>
-          <ol class="list-decimal pl-4 space-y-0.5">
-            <li>Dans Telegram, ouvrez <strong>@BotFather</strong> → envoyez <strong>/newbot</strong> → choisissez un nom. Copiez le <strong>jeton</strong> reçu.</li>
-            <li>Ouvrez votre nouveau bot et envoyez-lui <strong>/start</strong> (obligatoire, sinon il ne peut pas vous écrire).</li>
-            <li>Ouvrez <strong>@userinfobot</strong> : il vous donne votre <strong>Chat ID</strong> (un nombre). Pour un groupe : ajoutez le bot au groupe ; le Chat ID commence par un « - ».</li>
-          </ol>
-        </div>
-        <div>
-          <label class="field-label" for="n-token"><i class="fab fa-telegram"></i> Jeton du bot (token)</label>
-          <input class="field" id="n-token" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="123456789:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
-          <p id="n-token-hint" class="text-xs text-slate-500 mt-1">Le jeton est enregistré de façon privée dans la base : il n'est jamais affiché ni relu par cette page.</p>
-        </div>
-        <div>
-          <label class="field-label" for="n-chat"><i class="fas fa-id-badge"></i> Chat ID Telegram principal <span class="font-normal text-slate-400">(facultatif si chaque administrateur renseigne le sien)</span></label>
-          <input class="field" id="n-chat" type="text" inputmode="numeric" autocomplete="off" maxlength="40" placeholder="Ex : 123456789">
-        </div>
-        <div>
-          <label class="field-label" for="n-webhook"><i class="fas fa-plug"></i> Webhook <span class="font-normal text-slate-400">(facultatif)</span></label>
-          <input class="field" id="n-webhook" type="url" autocomplete="off" maxlength="500" placeholder="https://hook.eu1.make.com/…">
-          <p class="text-xs text-slate-500 mt-1">Chaque commande est aussi envoyée (JSON) à cette adresse : Make, Zapier, n8n… (ex. pour recevoir un e-mail). https:// obligatoire.</p>
-        </div>
-        <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="n-actif" type="checkbox" class="w-5 h-5 accent-brand" checked> Envoyer les notifications de commandes</label>
-        <p id="notif-error" class="form-error hidden" role="alert"></p>
-        <button id="btn-notif-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
-        <button id="btn-notif-clear" type="button" class="action-btn action-btn-ghost hidden"><i class="fas fa-trash"></i> Retirer le bot Telegram</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===== V4 : MODALE : AJOUTER UN ADMINISTRATEUR ===== -->
-  <div id="modal-adm-add" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adm-add-title">
-    <div class="modal-panel">
-      <button id="btn-adm-add-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
-      <h2 id="adm-add-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Ajouter un administrateur</h2>
-      <form id="form-adm-add" class="space-y-4 mt-4" novalidate>
-        <div>
-          <label class="field-label" for="a-email"><i class="fab fa-google"></i> Gmail (compte Google)</label>
-          <input class="field" id="a-email" type="email" autocomplete="off" maxlength="120" placeholder="prenom@gmail.com">
-          <p class="text-xs text-slate-500 mt-1">La personne se connectera à cet espace avec CE compte Google (bouton « Continuer avec Gmail »).</p>
-        </div>
-        <div>
-          <label class="field-label" for="a-nom"><i class="fas fa-user"></i> Nom affiché <span class="font-normal text-slate-400">(facultatif)</span></label>
-          <input class="field" id="a-nom" type="text" maxlength="60" placeholder="Ex : Awa — gestion des commandes">
-        </div>
-        <p id="adm-add-error" class="form-error hidden" role="alert"></p>
-        <button id="btn-adm-add-submit" type="submit" class="btn-main"><i class="fas fa-user-plus mr-2"></i> Ajouter</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===== V4 : MODALE : MODIFIER UN PROFIL ADMINISTRATEUR ===== -->
-  <div id="modal-adm-edit" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adm-edit-title">
-    <div class="modal-panel">
-      <button id="btn-adm-edit-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
-      <h2 id="adm-edit-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Profil administrateur</h2>
-      <p id="e-email" class="text-center text-sm font-bold text-slate-600 break-all mt-1"></p>
-      <form id="form-adm-edit" class="space-y-4 mt-4" novalidate>
-        <div>
-          <label class="field-label" for="e-nom"><i class="fas fa-user"></i> Nom affiché</label>
-          <input class="field" id="e-nom" type="text" maxlength="60">
-        </div>
-        <div>
-          <label class="field-label" for="e-chat"><i class="fab fa-telegram"></i> Chat ID Telegram <span class="font-normal text-slate-400">(pour recevoir les commandes)</span></label>
-          <input class="field" id="e-chat" type="text" inputmode="numeric" autocomplete="off" maxlength="40" placeholder="Ex : 123456789 (laissez vide pour ne rien recevoir)">
-          <p class="text-xs text-slate-500 mt-1">Ouvrez d'abord le bot de la boutique et envoyez-lui /start. Votre Chat ID s'obtient avec @userinfobot.</p>
-        </div>
-        <div id="e-role-box">
-          <label class="field-label" for="e-role"><i class="fas fa-shield-alt"></i> Rôle</label>
-          <select class="field" id="e-role"><option value="admin">Administrateur</option><option value="principal">Administrateur principal (peut gérer les administrateurs et le bot)</option></select>
-        </div>
-        <label id="e-actif-box" class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="e-actif" type="checkbox" class="w-5 h-5 accent-brand" checked> Accès autorisé (décochez pour suspendre)</label>
-        <p id="adm-edit-error" class="form-error hidden" role="alert"></p>
-        <button id="btn-adm-edit-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
       </form>
     </div>
   </div>

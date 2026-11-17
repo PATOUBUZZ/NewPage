@@ -7,14 +7,12 @@
 
   var DEFAUTS = {
     supabaseUrl: '', supabaseKey: '', cacheMinutes: 5, couleur: '#2563eb', devise: 'FCFA',
-    lotAffichage: 12, vitesseBande: 45, delaiCarrousel: 5000, whatsappSupport: '', cleCache: 'nb_cache_v3', cleePanier: 'nb_panier_v1', cleCommandes: 'nb_cmd_attente_v3'
+    lotAffichage: 12, vitesseBande: 45, whatsappSupport: '', cleCache: 'nb_cache_v1', cleePanier: 'nb_panier_v1'
   };
   var cfg = {};
   var src = window.NB_CONFIG || {};
   Object.keys(DEFAUTS).forEach(function (k) { cfg[k] = (src[k] !== undefined && src[k] !== null) ? src[k] : DEFAUTS[k]; });
   cfg.cleePanier = src.cleePanier || DEFAUTS.cleePanier;
-  cfg.cleCommandes = src.cleCommandes || DEFAUTS.cleCommandes;
-  cfg.delaiCarrousel = Math.max(2500, Number(cfg.delaiCarrousel) || 5000);   // jamais plus rapide que 2,5 s
 
   // ── Icônes (SVG fixes, écrites ici : jamais construites à partir de données saisies par un utilisateur)
   var ICONES = {
@@ -94,12 +92,6 @@
     if (m) m.setAttribute('content', c);
   }
 
-  /** Identifiant unique (sert à rendre l'envoi d'une commande « idempotent » : jamais de doublon) */
-  function uuid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
-  }
-
   function lire(cle) { try { return JSON.parse(localStorage.getItem(cle)); } catch (e) { return null; } }
   function ecrire(cle, v) { try { localStorage.setItem(cle, JSON.stringify(v)); } catch (e) { /* stockage bloqué : sans gravité */ } }
   function effacer(cle) { try { localStorage.removeItem(cle); } catch (e) { /* idem */ } }
@@ -107,7 +99,7 @@
   window.NB = {
     cfg: cfg, icon: icon, el: el, prix: prix, urlImage: urlImage, urlLien: urlLien,
     chiffres: chiffres, nbMots: nbMots, appliquerCouleur: appliquerCouleur,
-    lire: lire, ecrire: ecrire, effacer: effacer, uuid: uuid,
+    lire: lire, ecrire: ecrire, effacer: effacer,
     $: function (id) { return document.getElementById(id); }
   };
 })();

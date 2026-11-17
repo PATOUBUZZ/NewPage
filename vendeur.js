@@ -1,5 +1,5 @@
 /* ============================================================================
-   vendeur.js — VERSION 4 — Espace vendeur (vendeur.html) — même interface que l'ancien espace vendeur Nya-Market,
+   vendeur.js — Espace vendeur (vendeur.html) — même interface que l'ancien espace vendeur Nya-Market,
    SANS documents ni selfie.
    ----------------------------------------------------------------------------
    • Connexion Google ; accès UNIQUEMENT si le Gmail est dans la table « proprietaires » (fonction SQL est_proprietaire()).
@@ -11,11 +11,6 @@
    • Photos : ≤ 120 Ko → envoyées telles quelles ; > 120 Ko → WebP ≤ 130 Ko, meilleure qualité possible.
    • Bande défilante : ajouter / modifier / réordonner / masquer / supprimer (table « annonces », 10 maximum).
    • Informations : nom, propriétaire, description, WhatsApp, ville, localisation (table « boutique »).
-   • V2 : IMAGE DE COUVERTURE de l'en-tête du site (boutique.cover_url) : choisir / changer / retirer, avec compression automatique.
-   • V3 : CARROUSEL promotionnel (3 diapositives : image, titre, texte, lien, ordre, visibilité), COMMANDES reçues (liste, traitée / non traitée),
-          NOTIFICATIONS de commande (bot Telegram + webhook : réglages privés enregistrés par des fonctions SQL, jeton jamais relu).
-   • V4 : MULTI-ADMINISTRATEURS (5 profils maximum). Rôles « principal » (gère admins + bot) et « admin ». Chaque admin a son nom et son
-          Telegram. Toutes les règles sont appliquées par Supabase (fonctions SQL) : cette page ne fait qu'afficher les boutons autorisés.
    Toutes les données du vendeur sont échappées (esc) avant affichage : aucune injection HTML possible.
    ============================================================================ */
 (function () {
@@ -26,17 +21,12 @@
   var DEFAUT_MAX = 16;                         // doit rester identique à la valeur par défaut du SQL
   var MAX_PHOTOS = 4;
   var MAX_ANNONCES = 10;
-  var MAX_ADMINS = 5;                          // V4 : profils administrateurs (doit rester identique au SQL)
-  var MAX_SLIDES = 3;                          // V3 : diapositives du carrousel (doit rester identique au SQL)
-  var MODALES_SIMPLES = ['modal-loc', 'modal-shop', 'modal-ann', 'modal-slide', 'modal-notif', 'modal-adm-add', 'modal-adm-edit'];   // fermées par clic sur le fond ou la touche Échap
   var SEUIL_SANS_COMPRESSION = 120 * 1024;     // ≤ 120 Ko : on n'y touche pas
   var CIBLE_MAX = 130 * 1024;                  // > 120 Ko : on vise ≤ 130 Ko
   var QUALITE_MIN = 0.72;                      // en dessous, on préfère réduire un peu les dimensions
 
   var sb = null;
-  var S = { session: null, boutique: {}, produits: [], annonces: [], photos: [], editId: null, editAnn: null, chargeUne: false, dernierRefresh: 0,
-            slides: [], commandes: [], notif: null, manque: {}, editSlide: null, slideImg: null,
-            admins: [], moi: null, editAdm: null };
+  var S = { session: null, boutique: {}, produits: [], annonces: [], photos: [], editId: null, editAnn: null, chargeUne: false, dernierRefresh: 0 };
 
   /* ───────────────────────────── Utilitaires ───────────────────────────── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -51,7 +41,6 @@
   function uuid() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }); }
   function octets(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; }
   function invaliderCache() { NB.effacer(cfg.cleCache); }
-  function estPrincipal() { return !!(S.moi && S.moi.role === 'principal'); }       // V4 : simple confort d'affichage (la vraie règle est dans Supabase)
   function limite() { var m = parseInt(S.boutique && S.boutique.max_produits, 10); return m > 0 ? m : DEFAUT_MAX; }
   function fcfa(n) { return Number(n || 0).toLocaleString('fr-FR') + ' ' + cfg.devise; }
   function pourcent(normal, promo) { return Math.round((1 - promo / normal) * 100); }
@@ -67,13 +56,6 @@
     var m = String((e && (e.message || e.error_description)) || e || 'Erreur inconnue');
     if (/row-level security|violates row|permission denied|PGRST116|42501/i.test(m)) return 'Accès refusé : reconnectez-vous avec le compte propriétaire.';
     if (/Limite de/i.test(m)) return m;
-    if (/cover_url/i.test(m) && /column|schema cache|find/i.test(m)) return 'Base de données non à jour : lancez SQL/4-v2-couverture.sql dans Supabase.';
-    if (/cover_url/i.test(m)) return 'Adresse de l’image de couverture invalide.';
-    if (/telegram_token/i.test(m)) return 'Jeton du bot invalide (format attendu : 123456789:AAxxxxxxxx…).';
-    if (/telegram_chat_id/i.test(m)) return 'Chat ID invalide (un nombre comme 123456789, négatif pour un groupe, ou @nom_du_canal).';
-    if (/webhook_url/i.test(m)) return 'Adresse du webhook invalide (https:// obligatoire).';
-    if (/carrousel_non_vide/i.test(m)) return 'Ajoutez au moins une image, un titre ou un texte.';
-    if (/does not exist|Could not find the (table|function)|schema cache/i.test(m)) return 'Base de données non à jour : lancez le script SQL de cette version (voir le fichier configuration).';
     if (/plus_infos/i.test(m)) return '« Plus d’informations » : 60 mots maximum.';
     if (/ancien_prix/i.test(m)) return 'Le prix promotionnel doit être inférieur au prix normal.';
     if (/images/i.test(m) && /check|violat/i.test(m)) return 'Il faut entre 1 et 4 photos valides.';
@@ -221,36 +203,20 @@
   function deconnexion() { invaliderCache(); return sb.auth.signOut().then(function () { S.session = null; S.chargeUne = false; vue('landing'); }); }
 
   /* ───────────────────────────── Chargement des données ───────────────────────────── */
-  /** V3 : les nouvelles sections (carrousel, commandes, notifications) sont « douces » : si le script SQL/5 n'a pas été lancé,
-      le reste de l'espace vendeur fonctionne quand même et la section affiche un message explicite. */
-  function doux(cle, requete) {
-    return Promise.resolve(requete).then(function (r) {
-      if (r && r.error) { S.manque[cle] = true; return { data: null }; }
-      S.manque[cle] = false; return r;
-    }, function () { S.manque[cle] = true; return { data: null }; });
-  }
-
   function chargerTout() {
     return Promise.all([
       sb.from('boutique').select('*').eq('id', 1).maybeSingle(),
       sb.from('produits').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: false }),
-      sb.from('annonces').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true }),
-      doux('carrousel', sb.from('carrousel').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true })),
-      doux('commandes', sb.from('commandes').select('*').order('cree_le', { ascending: false }).limit(30)),
-      doux('notif', sb.rpc('notif_statut')),
-      doux('admins', sb.rpc('admins_lister')),
-      doux('profil', sb.rpc('mon_profil'))
+      sb.from('annonces').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true })
     ]).then(function (r) {
-      for (var i = 0; i < 3; i++) if (r[i].error) throw r[i].error;
+      for (var i = 0; i < r.length; i++) if (r[i].error) throw r[i].error;
       S.boutique = r[0].data || {}; S.produits = r[1].data || []; S.annonces = r[2].data || [];
-      S.slides = r[3].data || []; S.commandes = r[4].data || []; S.notif = r[5].data || null;
-      S.admins = Array.isArray(r[6].data) ? r[6].data : []; S.moi = r[7].data || null;
       S.chargeUne = true;
       dessinerTout();
     });
   }
 
-  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerCommandes(); dessinerCarrousel(); dessinerAnnonces(); dessinerCouverture(); dessinerNotif(); dessinerMoi(); dessinerAdmins(); majContacts(); }
+  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerAnnonces(); majContacts(); }
 
   /* ───────────────────────────── Carte boutique ───────────────────────────── */
   function urlBoutique() { return location.origin + location.pathname.replace(/[^\/]*$/, ''); }
@@ -271,6 +237,14 @@
     var url = urlBoutique();
     $('btn-view-shop').href = url;
     $('shop-link-input').value = url;
+
+    // V2 : aperçu de l'image de couverture
+    var cv = NB.urlImage(b.couverture_url), ci = $('cover-img');
+    if (cv) ci.src = cv; else ci.removeAttribute('src');
+    ci.classList.toggle('hidden', !cv); $('cover-overlay').classList.toggle('hidden', !cv); $('cover-empty').classList.toggle('hidden', !!cv);
+    $('cover-name').textContent = b.nom || '';
+    $('btn-cover-del').classList.toggle('hidden', !cv);
+    $('cover-pick-label').textContent = cv ? 'Changer l’image' : 'Choisir une image';
 
     $('i-prop').textContent = b.proprietaire || '—';
     $('i-wa').textContent = b.whatsapp ? '+' + b.whatsapp : '—';
@@ -352,6 +326,39 @@
       .then(function () { fermerModal('modal-shop'); toast('Informations enregistrées ✓'); })
       .catch(function (e) { erreur('shop-error', 'Échec : ' + messageErreur(e)); })
       .then(function () { occupeBtn(btn, false); });
+  }
+
+  /* ───────────────────────────── V2 : image de couverture ───────────────────────────── */
+  function choisirCouverture(fichier) {
+    erreur('cover-error', '');
+    if (!fichier) return;
+    var ancienne = S.boutique && S.boutique.couverture_url, neuf = null;
+    occupe('Optimisation de l’image…');
+    compresserImage(fichier).then(function (img) {
+      occupe('Envoi de l’image…');
+      return envoyerFichier('couvertures', img);
+    }).then(function (r) {
+      neuf = r.url;
+      return sb.from('boutique').update({ couverture_url: neuf }).eq('id', 1).select().single();
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      return supprimerFichiers(ancienne ? [ancienne] : []);
+    }).then(function () { invaliderCache(); return chargerTout(); })
+      .then(function () { toast('Image de couverture enregistrée ✓'); })
+      .catch(function (e) {
+        var p = neuf ? supprimerFichiers([neuf]) : Promise.resolve();
+        return p.then(function () { var m = messageErreur(e); erreur('cover-error', /couverture_url/i.test(m) ? 'La base n’est pas à jour : lancez SQL/4-v2-couverture.sql dans Supabase.' : 'Échec : ' + m); });
+      }).then(function () { occupe(false); $('cover-file').value = ''; });
+  }
+  function retirerCouverture() {
+    var ancienne = S.boutique && S.boutique.couverture_url; if (!ancienne) return;
+    if (!window.confirm('Retirer l’image de couverture ?')) return;
+    occupe('Suppression…'); erreur('cover-error', '');
+    sb.from('boutique').update({ couverture_url: null }).eq('id', 1).select().single()
+      .then(function (r) { if (r.error) throw r.error; return supprimerFichiers([ancienne]); })
+      .then(function () { invaliderCache(); return chargerTout(); })
+      .then(function () { toast('Image de couverture retirée.'); })
+      .catch(function (e) { erreur('cover-error', 'Échec : ' + messageErreur(e)); }).then(function () { occupe(false); });
   }
 
   /* ───────────────────────────── Produits : liste ───────────────────────────── */
@@ -602,393 +609,6 @@
     executer(p, 'Bande défilante mise à jour ✓').then(function (ok) { occupeBtn(btn, false); if (ok) fermerModal('modal-ann'); else erreur('ann-error', 'Enregistrement impossible.'); });
   }
 
-  /* ───────────────────────────── V2 : image de couverture de l'en-tête ───────────────────────────── */
-  function dessinerCouverture() {
-    var b = S.boutique || {}, u = NB.urlImage(b.cover_url), im = $('cover-img');
-    if (u) im.src = u; else im.removeAttribute('src');
-    im.classList.toggle('hidden', !u);
-    $('cover-empty').classList.toggle('hidden', !!u);
-    $('cover-preview-name').textContent = b.nom || 'Ma boutique';
-    $('btn-cover-remove').disabled = !u;
-    $('btn-cover-label').textContent = u ? 'Changer l’image' : 'Choisir une image';
-  }
-
-  /** Compresse (≤ 130 Ko) → envoie dans le stockage → enregistre l'adresse → supprime l'ancienne image. */
-  function changerCouverture(fichier) {
-    erreur('cover-error', '');
-    var ancienne = NB.urlImage((S.boutique || {}).cover_url), neuve = null, publie = false;
-    occupe('Optimisation de l’image…');
-    return compresserImage(fichier).then(function (r) {
-      occupe('Envoi de l’image…');
-      return envoyerFichier('couverture', r);
-    }).then(function (r) {
-      neuve = r.url;
-      return sb.from('boutique').update({ cover_url: neuve }).eq('id', 1).select().single();
-    }).then(function (r) {
-      if (r.error) throw r.error;
-      publie = true;                                                         // à partir d'ici la nouvelle image est en ligne
-      return supprimerFichiers(ancienne ? [ancienne] : []);
-    }).then(function () { invaliderCache(); return chargerTout(); })
-      .then(function () { toast('Image de couverture enregistrée ✓ Visible d’ici ' + cfg.cacheMinutes + ' min environ.'); })
-      .catch(function (e) {
-        var nettoyage = (neuve && !publie) ? supprimerFichiers([neuve]) : Promise.resolve();   // échec avant publication : on retire le fichier envoyé
-        return nettoyage.then(function () { erreur('cover-error', 'Échec : ' + messageErreur(e)); });
-      })
-      .then(function () { occupe(false); });
-  }
-
-  function retirerCouverture() {
-    var ancienne = NB.urlImage((S.boutique || {}).cover_url); if (!ancienne) return;
-    if (!window.confirm('Retirer l’image de couverture ? Le site affichera le dégradé de la couleur de votre boutique.')) return;
-    erreur('cover-error', ''); occupe('Suppression…');
-    sb.from('boutique').update({ cover_url: null }).eq('id', 1).select().single()
-      .then(function (r) { if (r.error) throw r.error; return supprimerFichiers([ancienne]); })
-      .then(function () { invaliderCache(); return chargerTout(); })
-      .then(function () { toast('Image de couverture retirée.'); })
-      .catch(function (e) { erreur('cover-error', 'Échec : ' + messageErreur(e)); })
-      .then(function () { occupe(false); });
-  }
-
-  /* ───────────────────────────── V3 : commandes reçues ───────────────────────────── */
-  function dessinerCommandes() {
-    var liste = $('cmd-list'), cnt = $('cmd-count');
-    if (S.manque.commandes) {
-      cnt.textContent = '';
-      liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Section indisponible : lancez <strong>SQL/5-v3-carrousel-commandes.sql</strong> dans Supabase.</p>';
-      return;
-    }
-    var nouvelles = S.commandes.filter(function (c) { return c.statut === 'nouvelle'; }).length;
-    cnt.textContent = nouvelles ? '(' + nouvelles + ' nouvelle' + (nouvelles > 1 ? 's' : '') + ')' : '';
-    if (!S.commandes.length) {
-      liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Aucune commande pour le moment.</p>';
-      return;
-    }
-    liste.innerHTML = S.commandes.map(function (c) {
-      var lignes = Array.isArray(c.lignes) ? c.lignes : [];
-      var d = new Date(c.cree_le), date = isNaN(d) ? '' : d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-      var tel = NB.chiffres(c.tel), fait = c.statut === 'traitee';
-      var gps = /^-?[0-9]{1,3}(\.[0-9]+)?,-?[0-9]{1,3}(\.[0-9]+)?$/.test(c.gps || '') ? 'https://www.google.com/maps?q=' + c.gps : '';
-      var devise = c.devise || cfg.devise;
-      return '<article class="cmd-card' + (fait ? ' done' : '') + '" data-num="' + esc(c.numero) + '">' +
-        '<div class="flex items-start justify-between gap-2">' +
-          '<p class="font-extrabold text-slate-900 break-words min-w-0">#' + esc(c.numero) + ' · ' + esc(c.nom) + '</p>' +
-          (fait ? '<span class="badge badge-publie"><i class="fas fa-check"></i> Traitée</span>' : '<span class="badge badge-review"><i class="fas fa-bell"></i> Nouvelle</span>') +
-        '</div>' +
-        '<p class="text-xs text-slate-500">' + esc(date) + '</p>' +
-        '<p class="font-extrabold text-deal mt-1">' + esc(Number(c.total || 0).toLocaleString('fr-FR') + ' ' + devise) + '</p>' +
-        '<details class="mt-1"><summary class="text-sm font-bold text-brand cursor-pointer">Voir le détail</summary>' +
-          '<ul class="cmd-lines">' + lignes.map(function (l) { return '<li>' + esc(l.nom) + ' × ' + esc(l.qte) + ' — ' + esc(Number((l.prix || 0) * (l.qte || 1)).toLocaleString('fr-FR') + ' ' + devise) + '</li>'; }).join('') + '</ul>' +
-          '<div class="mt-2 text-sm space-y-1">' +
-            (tel ? '<p><i class="fas fa-phone text-brand"></i> <a class="underline font-semibold" href="tel:+' + esc(tel) + '">' + esc(c.tel) + '</a></p>' : '') +
-            (c.adresse ? '<p><i class="fas fa-map-marker-alt text-brand"></i> ' + esc(c.adresse) + '</p>' : '') +
-            (gps ? '<p><i class="fas fa-location-crosshairs text-brand"></i> <a class="underline font-semibold" href="' + esc(gps) + '" target="_blank" rel="noopener">Position GPS du client</a></p>' : '') +
-            (c.note ? '<p><i class="fas fa-pen text-brand"></i> ' + esc(c.note) + '</p>' : '') +
-          '</div>' +
-        '</details>' +
-        '<div class="flex flex-wrap gap-2 mt-2">' +
-          '<button type="button" class="prod-act prod-hide" data-cm="toggle"><i class="fas ' + (fait ? 'fa-rotate-left' : 'fa-check') + '"></i> ' + (fait ? 'Remettre en nouvelle' : 'Marquer traitée') + '</button>' +
-          '<button type="button" class="prod-act prod-del" data-cm="delete"><i class="fas fa-trash"></i></button>' +
-        '</div>' +
-      '</article>';
-    }).join('');
-  }
-
-  function clicCommande(e) {
-    var b = e.target.closest('[data-cm]'); if (!b) return;
-    var card = b.closest('.cmd-card'), num = card && card.dataset.num;
-    var c = S.commandes.filter(function (x) { return String(x.numero) === num; })[0]; if (!c) return;
-    if (b.dataset.cm === 'toggle') executer(sb.from('commandes').update({ statut: c.statut === 'traitee' ? 'nouvelle' : 'traitee' }).eq('numero', c.numero).select().single(), 'Commande mise à jour ✓');
-    if (b.dataset.cm === 'delete' && window.confirm('Supprimer définitivement la commande #' + c.numero + ' ?')) executer(sb.from('commandes').delete().eq('numero', c.numero).select(), 'Commande supprimée.');
-  }
-
-  /* ───────────────────────────── V3 : carrousel promotionnel ───────────────────────────── */
-  function dessinerCarrousel() {
-    var liste = $('slide-list'), n = S.slides.length;
-    $('slide-count').textContent = S.manque.carrousel ? '' : '(' + n + '/' + MAX_SLIDES + ')';
-    $('btn-add-slide').disabled = !!S.manque.carrousel || n >= MAX_SLIDES;
-    if (S.manque.carrousel) {
-      liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Section indisponible : lancez <strong>SQL/5-v3-carrousel-commandes.sql</strong> dans Supabase.</p>';
-      return;
-    }
-    if (!n) { liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Aucune diapositive : le carrousel est masqué sur votre site.</p>'; return; }
-    liste.innerHTML = S.slides.map(function (sl, i) {
-      var img = NB.urlImage(sl.image_url);
-      return '<article class="ann-card' + (sl.visible ? '' : ' off') + '" data-id="' + esc(sl.id) + '">' +
-        (img ? '<img class="slide-thumb" src="' + esc(img) + '" alt="" loading="lazy">' : '<div class="slide-thumb slide-thumb-none"><i class="fas fa-image"></i></div>') +
-        '<div class="min-w-0 flex-1"><p class="font-bold text-sm break-words">' + esc(sl.titre || '(sans titre)') + (sl.visible ? '' : ' <span class="badge badge-off">Masquée</span>') + '</p>' +
-        (sl.texte ? '<p class="text-xs text-slate-600 break-words mt-0.5">' + esc(sl.texte) + '</p>' : '') +
-        (sl.lien ? '<p class="text-xs text-slate-500 break-all mt-0.5">🔗 ' + esc(sl.lien) + '</p>' : '') +
-        '<div class="flex flex-wrap gap-2 mt-2">' +
-          '<button type="button" class="prod-act prod-hide" data-sl="up" aria-label="Monter"' + (i === 0 ? ' disabled' : '') + '><i class="fas fa-arrow-up"></i></button>' +
-          '<button type="button" class="prod-act prod-hide" data-sl="down" aria-label="Descendre"' + (i === n - 1 ? ' disabled' : '') + '><i class="fas fa-arrow-down"></i></button>' +
-          '<button type="button" class="prod-act prod-edit" data-sl="edit"><i class="fas fa-pen"></i> Modifier</button>' +
-          '<button type="button" class="prod-act prod-hide" data-sl="toggle"><i class="fas ' + (sl.visible ? 'fa-eye-slash' : 'fa-eye') + '"></i> ' + (sl.visible ? 'Masquer' : 'Afficher') + '</button>' +
-          '<button type="button" class="prod-act prod-del" data-sl="delete"><i class="fas fa-trash"></i></button>' +
-        '</div></div></article>';
-    }).join('');
-  }
-
-  function deplacerSlide(i, sens) {
-    var j = i + sens; if (j < 0 || j >= S.slides.length) return;
-    var ids = S.slides.map(function (a) { return a.id; }); var t = ids[i]; ids[i] = ids[j]; ids[j] = t;
-    occupe('Enregistrement…');
-    ids.reduce(function (c, id, k) {
-      return c.then(function () {
-        var a = S.slides.filter(function (x) { return x.id === id; })[0]; if (a.ordre === k) return;
-        return sb.from('carrousel').update({ ordre: k }).eq('id', id).then(function (r) { if (r.error) throw r.error; });
-      });
-    }, Promise.resolve())
-      .then(function () { invaliderCache(); return chargerTout(); }).catch(function (e) { toast(messageErreur(e)); }).then(function () { occupe(false); });
-  }
-
-  function clicSlide(e) {
-    var b = e.target.closest('[data-sl]'); if (!b) return;
-    var card = b.closest('.ann-card'), idx = -1;
-    S.slides.forEach(function (a, i) { if (a.id === card.dataset.id) idx = i; });
-    if (idx < 0) return;
-    var sl = S.slides[idx], act = b.dataset.sl;
-    if (act === 'up') deplacerSlide(idx, -1);
-    if (act === 'down') deplacerSlide(idx, 1);
-    if (act === 'edit') ouvrirSlide(sl);
-    if (act === 'toggle') executer(sb.from('carrousel').update({ visible: !sl.visible }).eq('id', sl.id).select().single(), 'Diapositive mise à jour.');
-    if (act === 'delete' && window.confirm('Supprimer cette diapositive ?')) {
-      occupe('Suppression…');
-      sb.from('carrousel').delete().eq('id', sl.id).select()
-        .then(function (r) { if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('Accès refusé'); return supprimerFichiers(sl.image_url ? [sl.image_url] : []); })
-        .then(function () { invaliderCache(); return chargerTout(); })
-        .then(function () { toast('Diapositive supprimée.'); })
-        .catch(function (e) { toast(messageErreur(e)); }).then(function () { occupe(false); });
-    }
-  }
-
-  function libererApercuSlide() { if (S.slideImg && S.slideImg.blob && S.slideImg.apercu) URL.revokeObjectURL(S.slideImg.apercu); }
-
-  function dessinerApercuSlide() {
-    var im = $('slide-img'), u = S.slideImg ? S.slideImg.apercu : '';
-    if (u) im.src = u; else im.removeAttribute('src');
-    im.classList.toggle('hidden', !u);
-    $('sp-titre').textContent = $('s-titre').value.trim() || 'Votre titre';
-    $('sp-texte').textContent = $('s-texte').value.trim() || 'Votre texte promotionnel';
-    $('s-titre-count').textContent = $('s-titre').value.length + ' / 60';
-    $('s-texte-count').textContent = $('s-texte').value.length + ' / 140';
-    $('btn-slide-img-remove').disabled = !u;
-    $('btn-slide-img-label').textContent = u ? 'Changer l’image' : 'Choisir une image';
-  }
-
-  function ouvrirSlide(sl) {
-    if (!sl && S.slides.length >= MAX_SLIDES) { toast('Limite de ' + MAX_SLIDES + ' diapositives atteinte.'); return; }
-    libererApercuSlide();
-    S.editSlide = sl ? sl.id : null;
-    S.slideImg = sl && NB.urlImage(sl.image_url) ? { url: sl.image_url, apercu: sl.image_url } : null;
-    $('slide-title').textContent = sl ? 'Modifier la diapositive' : 'Nouvelle diapositive';
-    $('s-titre').value = sl ? sl.titre : ''; $('s-texte').value = sl ? sl.texte : ''; $('s-lien').value = sl && sl.lien ? sl.lien : '';
-    $('s-visible').checked = sl ? sl.visible : true; $('s-photo').value = '';
-    erreur('slide-error', ''); dessinerApercuSlide(); ouvrirModal('modal-slide');
-  }
-  function fermerSlide() { libererApercuSlide(); S.slideImg = null; fermerModal('modal-slide'); }
-
-  function choisirImageSlide(fichier) {
-    occupe('Optimisation de l’image…'); erreur('slide-error', '');
-    return compresserImage(fichier).then(function (r) {
-      libererApercuSlide();
-      S.slideImg = { blob: r.blob, type: r.type, ext: r.ext, apercu: URL.createObjectURL(r.blob), taille: r.taille };
-      dessinerApercuSlide();
-    }).catch(function (e) { erreur('slide-error', e.message || String(e)); }).then(function () { occupe(false); });
-  }
-
-  function enregistrerSlide(ev) {
-    ev.preventDefault(); erreur('slide-error', '');
-    var titre = $('s-titre').value.trim(), texte = $('s-texte').value.trim(), lien = $('s-lien').value.trim();
-    if (!titre && !texte && !S.slideImg) return erreur('slide-error', 'Ajoutez au moins une image, un titre ou un texte.');
-    if (titre.length > 60) return erreur('slide-error', 'Titre trop long (60 caractères maximum).');
-    if (texte.length > 140) return erreur('slide-error', 'Texte trop long (140 caractères maximum).');
-    if (lien && !/^(https:\/\/|\/|\?|#)/i.test(lien)) return erreur('slide-error', 'Le lien doit commencer par https://');
-    if (!S.editSlide && S.slides.length >= MAX_SLIDES) return erreur('slide-error', 'Limite de ' + MAX_SLIDES + ' diapositives atteinte.');
-
-    var orig = S.editSlide ? S.slides.filter(function (x) { return x.id === S.editSlide; })[0] : null;
-    var ancienne = orig && orig.image_url ? orig.image_url : null, envoye = null, publie = false, finale = null;
-    var btn = $('btn-slide-submit'); occupeBtn(btn, true, 'Enregistrement…');
-
-    var etape = Promise.resolve(null);
-    if (S.slideImg && S.slideImg.blob) etape = envoyerFichier('carrousel', S.slideImg).then(function (r) { envoye = r.url; return r.url; });
-    else if (S.slideImg) etape = Promise.resolve(S.slideImg.url);
-
-    etape.then(function (url) {
-      finale = url || null;
-      var champs = { titre: titre, texte: texte, image_url: finale, lien: lien || null, visible: $('s-visible').checked };
-      if (S.editSlide) return sb.from('carrousel').update(champs).eq('id', S.editSlide).select().single();
-      champs.ordre = S.slides.reduce(function (m, a) { return Math.max(m, a.ordre); }, -1) + 1;
-      return sb.from('carrousel').insert(champs).select().single();
-    }).then(function (r) {
-      if (r.error) throw r.error;
-      publie = true;
-      return supprimerFichiers(ancienne && ancienne !== finale ? [ancienne] : []);          // ancienne image remplacée ou retirée
-    }).then(function () { invaliderCache(); return chargerTout(); })
-      .then(function () { fermerSlide(); toast('Diapositive enregistrée ✓ Visible d’ici ' + cfg.cacheMinutes + ' min environ.'); })
-      .catch(function (e) {
-        var nettoyage = (envoye && !publie) ? supprimerFichiers([envoye]) : Promise.resolve();
-        return nettoyage.then(function () { erreur('slide-error', 'Échec : ' + messageErreur(e)); });
-      })
-      .then(function () { occupeBtn(btn, false); });
-  }
-
-  /* ───────────────────────────── V3 : notifications de commandes ───────────────────────────── */
-  function dessinerNotif() {
-    var n = S.notif, ok = !S.manque.notif && !!n, princ = estPrincipal();
-    $('btn-notif-edit').classList.toggle('hidden', !princ);              // seul le principal règle le bot et le webhook
-    $('btn-notif-test').classList.toggle('col-span-2', !princ);
-    $('btn-notif-edit').disabled = !ok; $('btn-notif-test').disabled = !ok;
-    var avert = $('notif-warn');
-    if (!ok) {
-      $('ns-tg').textContent = '—'; $('ns-wh').textContent = '—'; $('ns-actif').textContent = '—';
-      avert.textContent = 'Section indisponible : lancez SQL/5 puis SQL/6 dans Supabase.'; avert.classList.remove('hidden');
-      return;
-    }
-    if (!n.bot) $('ns-tg').textContent = '⚠️ Bot non configuré';
-    else if (!n.destinataires) $('ns-tg').textContent = '⚠️ Bot connecté, mais aucun destinataire (ajoutez un Chat ID)';
-    else $('ns-tg').textContent = '✅ Bot connecté · ' + n.destinataires + ' destinataire' + (n.destinataires > 1 ? 's' : '') + ' Telegram' + (n.token_fin ? ' (jeton …' + n.token_fin + ')' : '');
-    var hote = ''; if (n.webhook) { try { hote = new URL(n.webhook).host; } catch (e) { hote = 'adresse enregistrée'; } }
-    $('ns-wh').textContent = n.webhook_actif ? '✅ ' + (hote || 'configuré') : '— (facultatif)';
-    $('ns-actif').textContent = n.actif ? 'Activé' : '⏸ Désactivé : aucun message n’est envoyé';
-    var rien = !(n.bot && n.destinataires) && !n.webhook_actif;
-    avert.textContent = rien ? (princ ? 'Aucune notification active : touchez « Configurer » (jeton du bot), puis ajoutez un Chat ID (le vôtre ci-dessous dans « Administrateurs »). En attendant, les commandes restent visibles dans « Commandes reçues » et arrivent toujours sur WhatsApp.'
-                                       : 'Aucune notification active : demandez à l’administrateur principal de configurer le bot.') : '';
-    avert.classList.toggle('hidden', !rien);
-  }
-
-  function ouvrirNotif() {
-    if (!estPrincipal()) return;
-    var n = S.notif || {};
-    $('n-token').value = ''; $('n-chat').value = n.chat_id || ''; $('n-webhook').value = n.webhook || ''; $('n-actif').checked = n.actif !== false;
-    $('n-token-hint').textContent = n.bot
-      ? 'Un jeton est déjà enregistré (…' + n.token_fin + '). Laissez ce champ vide pour le conserver, ou collez-en un nouveau pour le remplacer.'
-      : 'Le jeton est enregistré de façon privée dans la base : il n’est jamais affiché ni relu par cette page.';
-    $('btn-notif-clear').classList.toggle('hidden', !n.bot);
-    erreur('notif-error', ''); ouvrirModal('modal-notif');
-  }
-
-  function enregistrerNotif(ev, vider) {
-    if (ev && ev.preventDefault) ev.preventDefault(); erreur('notif-error', '');
-    var token = $('n-token').value.trim(), chat = $('n-chat').value.trim(), hook = $('n-webhook').value.trim();
-    if (!vider) {
-      if (token && !/^[0-9]{6,12}:[A-Za-z0-9_-]{30,50}$/.test(token)) return erreur('notif-error', 'Jeton invalide : copiez-le tel quel depuis @BotFather (ex. 123456789:AAxxxxxxxx…).');
-      if (chat && !/^(-?[0-9]{5,20}|@[A-Za-z0-9_]{5,32})$/.test(chat)) return erreur('notif-error', 'Chat ID invalide : un nombre (ex. 123456789, négatif pour un groupe) ou @nom_du_canal.');
-      if (hook && !/^https:\/\//i.test(hook)) return erreur('notif-error', 'Le webhook doit commencer par https://');
-    }
-    var btn = $('btn-notif-submit'); occupeBtn(btn, true, 'Enregistrement…');
-    sb.rpc('notif_enregistrer', { p_token: token, p_chat_id: vider ? '' : chat, p_webhook: hook, p_actif: $('n-actif').checked, p_vider_token: !!vider })
-      .then(function (r) { if (r.error) throw r.error; return chargerTout(); })
-      .then(function () { fermerModal('modal-notif'); toast(vider ? 'Bot Telegram retiré.' : 'Notifications enregistrées ✓ Envoyez un test pour vérifier.'); })
-      .catch(function (e) { erreur('notif-error', 'Échec : ' + messageErreur(e)); })
-      .then(function () { occupeBtn(btn, false); });
-  }
-
-  function testerNotif() {
-    var sortie = $('notif-test-result'); sortie.classList.add('hidden');
-    function montrer(txt) { sortie.textContent = txt; sortie.classList.remove('hidden'); }
-    occupe('Envoi du message de test…');
-    sb.rpc('notif_tester').then(function (r) {
-      if (r.error) throw r.error;
-      var envois = r.data || [];
-      if (!envois.length) throw new Error('Aucun canal actif : renseignez le bot Telegram (jeton + Chat ID) ou un webhook, et cochez « Envoyer les notifications ».');
-      occupe('Vérification de la réception…');
-      return new Promise(function (ok) { setTimeout(ok, 3000); }).then(function () {
-        return sb.rpc('notif_resultats', { p_ids: envois.map(function (x) { return x.id; }) });
-      }).then(function (r2) { if (r2.error) throw r2.error; return { envois: envois, res: r2.data || [] }; });
-    }).then(function (o) {
-      montrer(o.envois.map(function (x) {
-        var rr = o.res.filter(function (y) { return y.id === x.id; })[0], nom = x.canal === 'telegram' ? 'Telegram' : 'Webhook';
-        if (!rr) return '⏳ ' + nom + ' : pas encore de réponse, réessayez le test dans quelques secondes.';
-        if (rr.status >= 200 && rr.status < 300) return '✅ ' + nom + ' : message envoyé, vérifiez votre téléphone.';
-        return '❌ ' + nom + ' : échec (code ' + (rr.status || 'aucune réponse') + '). ' + (rr.extrait || '');
-      }).join('\n'));
-    }).catch(function (e) { montrer('❌ ' + messageErreur(e)); }).then(function () { occupe(false); });
-  }
-
-  /* ───────────────────────────── V4 : administrateurs ───────────────────────────── */
-  function dessinerMoi() {
-    var m = S.moi, e = $('me-badge');
-    e.textContent = m ? '👤 Connecté : ' + (m.nom || m.email) + ' · ' + (m.role === 'principal' ? 'Administrateur principal' : 'Administrateur') : '';
-  }
-
-  function dessinerAdmins() {
-    var liste = $('adm-list'), princ = estPrincipal(), n = S.admins.length, moi = (S.moi && S.moi.email) || '';
-    $('adm-count').textContent = S.manque.admins ? '' : '(' + n + '/' + MAX_ADMINS + ')';
-    $('btn-add-admin').classList.toggle('hidden', !princ);
-    $('btn-add-admin').disabled = n >= MAX_ADMINS;
-    $('adm-rule').textContent = princ ? 'Vous êtes l’administrateur principal : vous pouvez ajouter, suspendre ou retirer des administrateurs.'
-                                      : 'Seul l’administrateur principal ajoute ou retire des administrateurs. Vous pouvez modifier votre propre profil.';
-    if (S.manque.admins) {
-      liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Section indisponible : lancez <strong>SQL/6-v4-multi-admins.sql</strong> dans Supabase.</p>';
-      return;
-    }
-    liste.innerHTML = S.admins.map(function (a) {
-      var moiMeme = a.email === moi;
-      return '<article class="ann-card' + (a.actif ? '' : ' off') + '" data-email="' + esc(a.email) + '">' +
-        '<div class="min-w-0 flex-1">' +
-          '<p class="font-bold text-sm break-words">' + esc(a.nom || '(sans nom)') + ' ' +
-            (a.role === 'principal' ? '<span class="badge badge-principal"><i class="fas fa-crown"></i> Principal</span> ' : '') +
-            (moiMeme ? '<span class="badge badge-vous">Vous</span> ' : '') +
-            (a.actif ? '' : '<span class="badge badge-off"><i class="fas fa-ban"></i> Suspendu</span> ') +
-            (a.telegram ? '<span class="badge badge-tg"><i class="fab fa-telegram"></i> Telegram</span>' : '') + '</p>' +
-          '<p class="text-xs text-slate-500 break-all mt-0.5">' + esc(a.email) + '</p>' +
-          '<div class="flex flex-wrap gap-2 mt-2">' +
-            ((princ || moiMeme) ? '<button type="button" class="prod-act prod-edit" data-ad="edit"><i class="fas fa-pen"></i> ' + (moiMeme ? 'Mon profil' : 'Modifier') + '</button>' : '') +
-            ((princ && !moiMeme) ? '<button type="button" class="prod-act prod-hide" data-ad="toggle"><i class="fas ' + (a.actif ? 'fa-ban' : 'fa-check') + '"></i> ' + (a.actif ? 'Suspendre' : 'Réactiver') + '</button>' : '') +
-            ((princ && !moiMeme) ? '<button type="button" class="prod-act prod-del" data-ad="delete"><i class="fas fa-user-minus"></i> Retirer</button>' : '') +
-          '</div></div></article>';
-    }).join('');
-  }
-
-  function clicAdmin(e) {
-    var b = e.target.closest('[data-ad]'); if (!b) return;
-    var card = b.closest('.ann-card'), a = S.admins.filter(function (x) { return x.email === card.dataset.email; })[0]; if (!a) return;
-    if (b.dataset.ad === 'edit') ouvrirAdmEdit(a);
-    if (b.dataset.ad === 'toggle') executer(sb.rpc('admin_modifier', { p_email: a.email, p_actif: !a.actif }), a.actif ? 'Administrateur suspendu.' : 'Administrateur réactivé ✓');
-    if (b.dataset.ad === 'delete' && window.confirm('Retirer ' + (a.nom || a.email) + ' ? Cette personne perd l’accès. Ses produits ne sont pas supprimés.'))
-      executer(sb.rpc('admin_retirer', { p_email: a.email }), 'Administrateur retiré.');
-  }
-
-  function ouvrirAdmAjout() {
-    if (S.admins.length >= MAX_ADMINS) { toast('Limite de ' + MAX_ADMINS + ' administrateurs atteinte.'); return; }
-    $('a-email').value = ''; $('a-nom').value = ''; erreur('adm-add-error', ''); ouvrirModal('modal-adm-add');
-  }
-  function enregistrerAdmAjout(ev) {
-    ev.preventDefault(); erreur('adm-add-error', '');
-    var email = $('a-email').value.trim().toLowerCase(), nom = $('a-nom').value.trim();
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return erreur('adm-add-error', 'Indiquez une adresse Gmail valide.');
-    var btn = $('btn-adm-add-submit'); occupeBtn(btn, true, 'Ajout…');
-    sb.rpc('admin_ajouter', { p_email: email, p_nom: nom })
-      .then(function (r) { if (r.error) throw r.error; return chargerTout(); })
-      .then(function () { fermerModal('modal-adm-add'); toast('Administrateur ajouté ✓ Il peut se connecter avec ce compte Google.'); })
-      .catch(function (e) { erreur('adm-add-error', 'Échec : ' + messageErreur(e)); })
-      .then(function () { occupeBtn(btn, false); });
-  }
-
-  function ouvrirAdmEdit(a) {
-    var moiMeme = !!(S.moi && a.email === S.moi.email), princ = estPrincipal();
-    S.editAdm = a.email;
-    $('adm-edit-title').textContent = moiMeme ? 'Mon profil' : 'Profil administrateur';
-    $('e-email').textContent = a.email; $('e-nom').value = a.nom || ''; $('e-chat').value = a.telegram_chat_id || '';
-    $('e-role').value = a.role; $('e-actif').checked = a.actif;
-    $('e-role-box').classList.toggle('hidden', !princ);
-    $('e-actif-box').classList.toggle('hidden', !princ || moiMeme);                 // on ne se suspend pas soi-même
-    erreur('adm-edit-error', ''); ouvrirModal('modal-adm-edit');
-  }
-  function enregistrerAdmEdit(ev) {
-    ev.preventDefault(); erreur('adm-edit-error', '');
-    var chat = $('e-chat').value.trim(), moiMeme = !!(S.moi && S.editAdm === S.moi.email), princ = estPrincipal();
-    if (chat && !/^(-?[0-9]{5,20}|@[A-Za-z0-9_]{5,32})$/.test(chat)) return erreur('adm-edit-error', 'Chat ID invalide : un nombre (ex. 123456789) ou @nom_du_canal.');
-    var args = { p_email: S.editAdm, p_nom: $('e-nom').value.trim(), p_chat_id: chat };
-    if (princ) { args.p_role = $('e-role').value; if (!moiMeme) args.p_actif = $('e-actif').checked; }
-    var btn = $('btn-adm-edit-submit'); occupeBtn(btn, true, 'Enregistrement…');
-    sb.rpc('admin_modifier', args)
-      .then(function (r) { if (r.error) throw r.error; return chargerTout(); })
-      .then(function () { fermerModal('modal-adm-edit'); toast('Profil enregistré ✓'); })
-      .catch(function (e) { erreur('adm-edit-error', 'Échec : ' + messageErreur(e)); })
-      .then(function () { occupeBtn(btn, false); });
-  }
-
   /* ───────────────────────────── Démarrage ───────────────────────────── */
   function init() {
     Array.prototype.forEach.call(document.querySelectorAll('.devise'), function (n) { n.textContent = cfg.devise; });
@@ -1011,6 +631,8 @@
     $('btn-edit-shop').onclick = ouvrirInfos;
     $('btn-shop-close').onclick = function () { fermerModal('modal-shop'); };
     $('form-shop').addEventListener('submit', enregistrerInfos);
+    $('cover-file').addEventListener('change', function (e) { choisirCouverture(e.target.files && e.target.files[0]); });
+    $('btn-cover-del').onclick = retirerCouverture;
     $('btn-copy-link').onclick = copierLien;
     $('btn-share-link').onclick = partagerLien;
 
@@ -1034,38 +656,11 @@
     $('a-msg').addEventListener('input', function () { $('a-count').textContent = $('a-msg').value.length + ' / 160'; });
     $('form-ann').addEventListener('submit', enregistrerAnnonce);
 
-    // V4 : administrateurs
-    $('btn-add-admin').onclick = ouvrirAdmAjout;
-    $('adm-list').addEventListener('click', clicAdmin);
-    $('btn-adm-add-close').onclick = function () { fermerModal('modal-adm-add'); };
-    $('btn-adm-edit-close').onclick = function () { fermerModal('modal-adm-edit'); };
-    $('form-adm-add').addEventListener('submit', enregistrerAdmAjout);
-    $('form-adm-edit').addEventListener('submit', enregistrerAdmEdit);
-
-    // V3 : commandes, carrousel, notifications
-    $('cmd-list').addEventListener('click', clicCommande);
-    $('btn-add-slide').onclick = function () { ouvrirSlide(null); };
-    $('slide-list').addEventListener('click', clicSlide);
-    $('btn-slide-close').onclick = fermerSlide;
-    $('form-slide').addEventListener('submit', enregistrerSlide);
-    $('s-photo').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (f) choisirImageSlide(f).then(function () { e.target.value = ''; }); });
-    $('btn-slide-img-remove').onclick = function () { libererApercuSlide(); S.slideImg = null; dessinerApercuSlide(); };
-    ['s-titre', 's-texte'].forEach(function (id) { $(id).addEventListener('input', dessinerApercuSlide); });
-    $('btn-notif-edit').onclick = ouvrirNotif;
-    $('btn-notif-test').onclick = testerNotif;
-    $('btn-notif-close').onclick = function () { fermerModal('modal-notif'); };
-    $('form-notif').addEventListener('submit', function (e) { enregistrerNotif(e, false); });
-    $('btn-notif-clear').onclick = function () { if (window.confirm('Retirer le bot Telegram ? Vous ne recevrez plus les commandes sur Telegram.')) enregistrerNotif(null, true); };
-
-    // V2 : image de couverture
-    $('f-cover').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (f) changerCouverture(f).then(function () { e.target.value = ''; }); });
-    $('btn-cover-remove').onclick = retirerCouverture;
-
-    MODALES_SIMPLES.forEach(function (id) { $(id).addEventListener('click', function (e) { if (e.target === this) fermerModal(id); }); });
+    ['modal-loc', 'modal-shop', 'modal-ann'].forEach(function (id) { $(id).addEventListener('click', function (e) { if (e.target === this) fermerModal(id); }); });
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
       if (!$('modal-product').classList.contains('hidden')) fermerProduit();
-      MODALES_SIMPLES.forEach(function (id) { if (!$(id).classList.contains('hidden')) fermerModal(id); });
+      ['modal-loc', 'modal-shop', 'modal-ann'].forEach(function (id) { if (!$(id).classList.contains('hidden')) fermerModal(id); });
     });
 
     // Au retour sur l'onglet : actualisation discrète (max. 1 fois / 30 s)

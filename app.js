@@ -1,18 +1,15 @@
 /* ============================================================================
-   app.js — Site visiteur de la boutique unique (VERSION 4 = V3 : en-tête 20vh + carrousel infini + notification de commande ; la multi-administration se pilote dans vendeur.html)
+   app.js — Site visiteur de la boutique unique
    ----------------------------------------------------------------------------
    1. Charge boutique + produits visibles + annonces depuis Supabase (API REST publique, lecture seule),
       avec un CACHE navigateur de config.cacheMinutes minutes (5 par défaut).
-   2. En-tête fixe de 20vh : IMAGE DE COUVERTURE du vendeur (boutique.cover_url) + filtre sombre + bande défilante infinie (annonces) + logo, nom, panier.
+   2. Bande défilante infinie (annonces) + en-tête fixe (logo, nom, panier).
    3. Grille 2×2, produits MÉLANGÉS à chaque chargement (sauf si boutique.melange_actif = false), affichage progressif
       par lots (lazy loading : les lots suivants se chargent au défilement, images en loading="lazy").
    4. Vue détail : galerie jusqu'à 4 photos, description, caractéristiques, boutons Commander / Ajouter au panier / Partager,
       bloc « Plus d'informations » (≤ 60 mots). PAS de défilement d'un produit à l'autre : bouton « Voir tous les produits ».
    5. Panier (mémorisé dans le navigateur) + commande envoyée sur WhatsApp.
    6. Pied de page : informations réelles de la boutique.
-   7. V3 — Carrousel promotionnel infini (jusqu'à 3 diapositives : image + titre + texte + lien), 20vh sous l'en-tête fixe.
-   8. V3 — À la validation du panier : la commande est ENREGISTRÉE dans Supabase (fonction passer_commande) et le vendeur reçoit
-      une notification (Telegram / webhook) avec le récapitulatif. Le message WhatsApp du client s'ouvre comme avant (aucun changement).
    Toutes les données affichées passent par textContent / setAttribute : aucune injection HTML possible.
    ============================================================================ */
 (function () {
@@ -21,7 +18,7 @@
   var NB = window.NB, cfg = NB.cfg, el = NB.el, $ = NB.$;
 
   var etat = {
-    boutique: {}, produits: [], annonces: [], carrousel: [], parId: {},
+    boutique: {}, produits: [], annonces: [], parId: {},
     ordre: [],            // ids dans l'ordre d'affichage de la grille (mélangé ou fixe)
     affiches: 0,          // nombre de cartes déjà affichées
     vue: 'grille',        // 'grille' | 'detail'
@@ -85,15 +82,10 @@
   }
   function telecharger() {
     return Promise.all([
-      // V2 : on demande aussi « cover_url ». Si le script SQL/4-v2-couverture.sql n'a pas encore été lancé, la colonne n'existe pas :
-      // on retombe alors sur la requête de la V1 (le site continue de fonctionner, simplement sans couverture).
-      rest('boutique?select=nom,proprietaire,description,ville,localisation,whatsapp,logo_url,melange_actif,cover_url&id=eq.1')
-        .catch(function () { return rest('boutique?select=nom,proprietaire,description,ville,localisation,whatsapp,logo_url,melange_actif&id=eq.1'); }),
+      rest('boutique?select=*&id=eq.1')       /* « * » : fonctionne même si une colonne récente (couverture…) n'existe pas encore */,
       rest('produits?select=id,nom,prix,ancien_prix,description,caracteristiques,plus_infos,images,ordre,cree_le&visible=eq.true&order=ordre.asc,cree_le.desc&limit=1000'),
-      rest('annonces?select=id,message,lien&visible=eq.true&order=ordre.asc,cree_le.asc'),
-      // V3 : carrousel. Si le script SQL/5 n'a pas été lancé, la table n'existe pas : on continue sans carrousel.
-      rest('carrousel?select=id,titre,texte,image_url,lien&visible=eq.true&order=ordre.asc,cree_le.asc&limit=3').catch(function () { return []; })
-    ]).then(function (r) { return { t: Date.now(), boutique: r[0][0] || {}, produits: r[1] || [], annonces: r[2] || [], carrousel: r[3] || [] }; });
+      rest('annonces?select=id,message,lien&visible=eq.true&order=ordre.asc,cree_le.asc')
+    ]).then(function (r) { return { t: Date.now(), boutique: r[0][0] || {}, produits: r[1] || [], annonces: r[2] || [] }; });
   }
   /** Cache : données fraîches (< cacheMinutes) → aucun appel réseau. Sinon on télécharge ; si le réseau échoue, on retombe sur le cache périmé. */
   function charger() {
@@ -116,7 +108,6 @@
     var nom = b.nom || 'Boutique';
     $('brand-name').textContent = nom;
     logo($('brand-logo'), b);
-    appliquerCouverture(b);
     document.title = nom;
     var og = document.querySelector('meta[property="og:title"]'); if (og) og.setAttribute('content', nom);
     var desc = (b.description || '').slice(0, 160);
@@ -125,20 +116,19 @@
       var od = document.querySelector('meta[property="og:description"]'); if (od) od.setAttribute('content', desc);
     }
     var u = NB.urlImage(b.logo_url); if (u) $('favicon').setAttribute('href', u);
+    appliquerCouverture(b.couverture_url);
   }
 
-  /** V2 — Image de couverture de l'en-tête : <img> créée par DOM (aucune injection possible), https uniquement.
-      La classe « has-cover » active le filtre sombre renforcé (style.css) pour garder le texte lisible. */
-  function appliquerCouverture(b) {
-    var zone = $('header-cover'), entete = $('site-header');
-    zone.textContent = ''; entete.classList.remove('has-cover');
-    var u = NB.urlImage(b.cover_url);
-    if (!u) return;                                               // pas de couverture : dégradé de la couleur de la boutique
-    var im = el('img', { src: u, alt: '', decoding: 'async', fetchpriority: 'high' });
-    im.onload = function () { entete.classList.add('has-cover'); };
-    im.onerror = function () { zone.textContent = ''; entete.classList.remove('has-cover'); };   // image cassée : on revient au dégradé
-    zone.appendChild(im);
-    if (im.complete && im.naturalWidth) entete.classList.add('has-cover');
+  /* V2 — Image de couverture de l'en-tête fixe : le nom de la boutique et le panier se superposent par-dessus.
+     L'image se règle depuis l'espace vendeur (ou boutique.couverture_url dans Supabase). Sans image : en-tête dégradé habituel. */
+  function appliquerCouverture(url) {
+    var hd = document.querySelector('.site-header'), u = NB.urlImage(url);
+    function retirer() { hd.classList.remove('has-cover'); hd.style.removeProperty('--cover'); mesurerHaut(); }
+    if (!u) return retirer();
+    var test = new Image();
+    test.onload = function () { hd.style.setProperty('--cover', 'url("' + u.replace(/["\\()\s]/g, function (c) { return '%' + ('0' + c.charCodeAt(0).toString(16)).slice(-2).toUpperCase(); }) + '")'); hd.classList.add('has-cover'); mesurerHaut(); };
+    test.onerror = retirer;                                    // image introuvable : on garde l'en-tête classique
+    test.src = u;
   }
 
   function construireBande(annonces) {
@@ -172,126 +162,6 @@
     mesurerHaut();
   }
 
-  /* ───────────────────────────── V3 : carrousel promotionnel infini ─────────────────────────────
-     Principe de la boucle infinie : la bande contient [copie de la DERNIÈRE] [1] [2] [3] [copie de la PREMIÈRE].
-     On glisse toujours vers l'avant ; en arrivant sur une copie, on « saute » (sans animation) sur la vraie diapositive
-     correspondante : l'œil ne voit jamais la coupure. Défilement automatique (cfg.delaiCarrousel), balayage tactile,
-     points cliquables, pause au survol / pendant le toucher / quand l'onglet est caché. Une seule diapositive = pas de boucle. */
-  var car = { n: 0, idx: 1, timer: null, fin: null, anime: false, glisse: false, horiz: false, bouge: false, pause: false, x0: 0, y0: 0, dx: 0 };
-
-  function creerSlide(s, clone) {
-    var lien = NB.urlLien(s.lien), img = NB.urlImage(s.image_url);
-    var n = el(lien ? 'a' : 'div', { 'class': 'promo-slide' });
-    if (lien) {
-      n.setAttribute('href', lien);
-      if (/^https:\/\//i.test(lien)) { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); }
-    }
-    if (img) n.appendChild(el('img', { 'class': 'promo-img', src: img, alt: '', decoding: 'async', draggable: 'false' }));
-    n.appendChild(el('span', { 'class': 'promo-shade', 'aria-hidden': 'true' }));          // filtre sombre : texte lisible sur toute image
-    var txt = el('div', { 'class': 'promo-text' });
-    if (s.titre) txt.appendChild(el('h2', { 'class': 'promo-title', text: s.titre }));
-    if (s.texte) txt.appendChild(el('p', { 'class': 'promo-desc', text: s.texte }));
-    if (lien) txt.appendChild(el('span', { 'class': 'promo-cta', text: 'Voir l’offre ›' }));
-    n.appendChild(txt);
-    if (clone) { n.setAttribute('aria-hidden', 'true'); n.setAttribute('tabindex', '-1'); }   // les copies de boucle sont invisibles pour les lecteurs d'écran
-    return n;
-  }
-
-  function carPlacer(animer) {
-    var piste = $('promo-track');
-    piste.style.transition = animer ? 'transform .55s cubic-bezier(.22,.8,.24,1)' : 'none';
-    piste.style.transform = 'translate3d(' + (-car.idx * 100) + '%,0,0)';
-    if (!animer) void piste.offsetWidth;                         // force l'application immédiate avant la prochaine animation
-  }
-  function carMajPoints() {
-    var reel = car.n > 1 ? ((car.idx - 1 + car.n) % car.n) : 0;   // copie du début → dernière vraie, copie de fin → première vraie
-    Array.prototype.forEach.call($('promo-dots').children, function (b, k) {
-      b.classList.toggle('active', k === reel); b.setAttribute('aria-current', k === reel ? 'true' : 'false');
-    });
-  }
-  function carAller(i) {
-    if (car.n < 2 || car.anime) return;
-    car.anime = true; car.idx = i; carPlacer(true); carMajPoints();
-    clearTimeout(car.fin); car.fin = setTimeout(carFin, 750);     // filet de sécurité si « transitionend » ne part pas (onglet caché)
-  }
-  function carFin() {
-    clearTimeout(car.fin);
-    car.anime = false;
-    if (car.idx === 0) { car.idx = car.n; carPlacer(false); }                // arrivé sur la copie de la dernière → saut invisible
-    else if (car.idx === car.n + 1) { car.idx = 1; carPlacer(false); }       // arrivé sur la copie de la première → saut invisible
-    carMajPoints();
-  }
-  function carDemarrer() {
-    clearInterval(car.timer);
-    var reduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (car.n < 2 || reduit) return;                              // mouvement réduit : pas d'animation automatique (balayage et points restent actifs)
-    car.timer = setInterval(function () {
-      if (document.hidden || car.pause || car.glisse || car.anime || $('promo').offsetParent === null) return;
-      carAller(car.idx + 1);
-    }, cfg.delaiCarrousel);
-  }
-
-  function construireCarrousel(slides) {
-    var zone = $('promo'), piste = $('promo-track'), pts = $('promo-dots');
-    clearInterval(car.timer); clearTimeout(car.fin);
-    piste.textContent = ''; pts.textContent = '';
-    slides = (slides || []).filter(function (s) { return s && (s.titre || s.texte || NB.urlImage(s.image_url)); }).slice(0, 3);
-    car.n = slides.length; car.idx = 1; car.anime = false; car.glisse = false;
-    if (!car.n) { zone.hidden = true; return; }
-    zone.hidden = false;
-    if (car.n === 1) {                                            // une seule diapositive : fixe, sans boucle ni points
-      piste.appendChild(creerSlide(slides[0], false));
-      piste.style.transition = 'none'; piste.style.transform = 'none';
-      return;
-    }
-    piste.appendChild(creerSlide(slides[car.n - 1], true));       // copie de la dernière, à gauche de la première
-    slides.forEach(function (s) { piste.appendChild(creerSlide(s, false)); });
-    piste.appendChild(creerSlide(slides[0], true));               // copie de la première, à droite de la dernière
-    slides.forEach(function (s, k) {
-      var b = el('button', { 'class': 'promo-dot', type: 'button', 'aria-label': 'Afficher la promotion ' + (k + 1) });
-      b.onclick = function () { carAller(k + 1); };
-      pts.appendChild(b);
-    });
-    carPlacer(false); carMajPoints(); carDemarrer();
-  }
-
-  function initCarrousel() {
-    var zone = $('promo'), piste = $('promo-track');
-    piste.addEventListener('transitionend', function (e) { if (e.target === piste) carFin(); });
-    zone.addEventListener('mouseenter', function () { car.pause = true; });
-    zone.addEventListener('mouseleave', function () { car.pause = false; });
-    zone.addEventListener('focusin', function () { car.pause = true; });
-    zone.addEventListener('focusout', function () { car.pause = false; });
-    // Balayage tactile : la bande suit le doigt, puis glisse vers la diapositive voisine si le geste est assez long
-    zone.addEventListener('touchstart', function (e) {
-      if (car.n < 2 || car.anime) return;
-      var t = e.touches[0]; car.glisse = true; car.horiz = false; car.bouge = false; car.x0 = t.clientX; car.y0 = t.clientY; car.dx = 0;
-      piste.style.transition = 'none';
-    }, { passive: true });
-    zone.addEventListener('touchmove', function (e) {
-      if (!car.glisse) return;
-      var t = e.touches[0], dx = t.clientX - car.x0, dy = t.clientY - car.y0;
-      if (!car.horiz) {
-        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-        if (Math.abs(dy) > Math.abs(dx)) { car.glisse = false; carPlacer(true); return; }     // geste vertical : c'est un défilement de page
-        car.horiz = true;
-      }
-      car.dx = dx; car.bouge = Math.abs(dx) > 8;
-      piste.style.transform = 'translate3d(calc(' + (-car.idx * 100) + '% + ' + dx + 'px),0,0)';
-    }, { passive: true });
-    function finGeste() {
-      if (!car.glisse) return;
-      car.glisse = false;
-      var seuil = Math.min(80, zone.offsetWidth * 0.18);
-      if (car.horiz && Math.abs(car.dx) > seuil) carAller(car.idx + (car.dx < 0 ? 1 : -1)); else carPlacer(true);
-    }
-    zone.addEventListener('touchend', finGeste);
-    zone.addEventListener('touchcancel', finGeste);
-    // Après un balayage, on empêche le « clic » involontaire sur le lien de la diapositive
-    zone.addEventListener('click', function (e) { if (car.bouge) { e.preventDefault(); e.stopPropagation(); car.bouge = false; } }, true);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden && car.n > 1) carFin(); });
-  }
-
   function construirePied(b) {
     var pied = $('shop-info'); pied.textContent = '';
     var tete = el('div', { 'class': 'shop-head' });
@@ -313,7 +183,9 @@
 
   /** Hauteur de la zone fixe (bande + en-tête) → marge haute de la page */
   function mesurerHaut() {
-    var h = $('top-fixed').offsetHeight;
+    var t = $('top-fixed');
+    if (t.classList.contains('compact')) return;              // en-tête réduit pendant le défilement : on garde la hauteur complète mesurée avant
+    var h = t.offsetHeight;
     if (h) document.documentElement.style.setProperty('--top-h', h + 'px');
   }
 
@@ -554,55 +426,12 @@
     if (note) lignes.push('📝 ' + note);
     lignes.push('', 'Paiement à la livraison.');
 
-    // V3 : AVANT de vider le panier, la commande est enregistrée et le vendeur est notifié (envoi en arrière-plan : n'empêche jamais l'ouverture de WhatsApp)
-    notifierVendeur({ nom: nom, tel: tel, adr: adr, note: note, gps: gps });
-
     var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(lignes.join('\n'));
     var w = window.open(url, '_blank');                       // (pas de « noopener » ici : il ferait renvoyer null même quand la fenêtre s'ouvre)
     if (w) { try { w.opener = null; } catch (err) { /* sans gravité */ } }
     else location.href = url;                                 // fenêtre bloquée : on ouvre dans le même onglet
     etat.panier = []; sauverPanier(); fermerPanier(); toast('Commande prête : validez l’envoi dans WhatsApp ✓');
     $('order-form').reset(); retirerPosition();
-  }
-
-  /* ───────────────────────────── V3 : enregistrement de la commande + notification au vendeur ─────────────────────────────
-     Le navigateur appelle la fonction SQL « passer_commande » (Supabase). Elle RECALCULE les prix depuis la base, enregistre la commande,
-     puis un déclencheur envoie le récapitulatif au vendeur (Telegram et/ou webhook) : le jeton du bot reste dans la base, jamais dans ce fichier.
-     • L'appel est lancé « en arrière-plan » (keepalive) : l'ouverture de WhatsApp n'attend pas, et la page peut même se fermer.
-     • Réseau coupé / panne : la commande est mise en file d'attente dans le navigateur et renvoyée au prochain chargement du site.
-     • Chaque commande a un identifiant unique (p_ref) : renvoyer 2 fois la même commande ne crée jamais de doublon. */
-  function corpsCommande(d) {
-    return {
-      p_ref: NB.uuid(), p_nom: d.nom, p_tel: d.tel, p_adresse: d.adr, p_note: d.note,
-      p_gps: d.gps ? d.gps.lat + ',' + d.gps.lng : '', p_precision: d.gps ? Number(d.gps.precision) || 0 : null,
-      p_devise: cfg.devise,
-      p_lignes: etat.panier.map(function (i) { return { id: i.id, qte: i.qte }; })
-    };
-  }
-  function postCommande(corps) {
-    var h = entetes(); h['Content-Type'] = 'application/json';
-    return fetch(cfg.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/rpc/passer_commande', { method: 'POST', headers: h, body: JSON.stringify(corps), keepalive: true })
-      .then(function (r) {
-        if (!r.ok) { var er = new Error('HTTP ' + r.status); er.status = r.status; throw er; }
-        return r.json();
-      });
-  }
-  function mettreEnAttente(corps) {
-    var f = NB.lire(cfg.cleCommandes); f = Array.isArray(f) ? f : [];
-    f.push(corps); NB.ecrire(cfg.cleCommandes, f.slice(-10));
-  }
-  function notifierVendeur(d) {
-    var corps = corpsCommande(d);
-    postCommande(corps).catch(function (e) {
-      if (window.console) console.warn('Notification vendeur : envoi différé.', e);
-      if (!e.status || e.status >= 500) mettreEnAttente(corps);            // coupure réseau / panne serveur : on réessaiera. (Erreur 4xx = commande refusée : inutile de réessayer.)
-    });
-  }
-  function renvoyerEnAttente() {
-    var f = NB.lire(cfg.cleCommandes);
-    if (!Array.isArray(f) || !f.length) return;
-    NB.effacer(cfg.cleCommandes);
-    f.forEach(function (c) { postCommande(c).catch(function (e) { if (!e.status || e.status >= 500) mettreEnAttente(c); }); });
   }
 
   /* ───────────────────────────── Position GPS du client (facultative) ─────────────────────────────
@@ -639,7 +468,7 @@
 
   /* ───────────────────────────── Démarrage ───────────────────────────── */
   function afficherDonnees(d) {
-    etat.boutique = d.boutique || {}; etat.produits = d.produits || []; etat.annonces = d.annonces || []; etat.carrousel = d.carrousel || [];
+    etat.boutique = d.boutique || {}; etat.produits = d.produits || []; etat.annonces = d.annonces || [];
     etat.parId = {}; etat.produits.forEach(function (p) { if (p && p.id && p.nom && p.images && p.images.length) etat.parId[p.id] = p; });
     construireCodes();
     var valides = Object.keys(etat.parId).map(function (k) { return etat.parId[k]; });
@@ -649,7 +478,7 @@
       etat.ordre = valides.map(function (p) { return p.id; });
     } else etat.ordre = melanger(valides).map(function (p) { return p.id; });
 
-    appliquerBoutique(etat.boutique); construireBande(etat.annonces); construireCarrousel(etat.carrousel); construirePied(etat.boutique);
+    appliquerBoutique(etat.boutique); construireBande(etat.annonces); construirePied(etat.boutique);
     synchroniserPanier();
     afficherGrille();
     var id = idDansUrl();                                         // lien de partage : on ouvre directement le produit
@@ -677,8 +506,6 @@
     $('geo-icon').appendChild(NB.icon('pin', 18)); $('geo-btn').onclick = obtenirPosition;
     $('cart-close').appendChild(NB.icon('close', 18));
     chargerPanier(); majBadge();
-    initCarrousel();
-    renvoyerEnAttente();
 
     $('cart-btn').onclick = ouvrirPanier;
     $('cart-close').onclick = fermerPanier;
@@ -702,8 +529,20 @@
       e.preventDefault(); ouvrirProduit(a.getAttribute('data-id'), true);
     });
     window.addEventListener('popstate', surNavigation);
-    window.addEventListener('hashchange', function () { if (etat.parCode) surNavigation(); });
+    // V2 — En-tête avec couverture : il se réduit quand on fait défiler la page (plus de place pour les produits)
+    var tickScroll = false;
+    window.addEventListener('scroll', function () {
+      if (tickScroll) return; tickScroll = true;
+      window.requestAnimationFrame(function () { tickScroll = false; $('top-fixed').classList.toggle('compact', window.pageYOffset > 70); });
+    }, { passive: true });
     window.addEventListener('resize', mesurerHaut);
+    // V2 — Ordinateur : flèches ← → du clavier pour changer de photo dans la vue détail
+    document.addEventListener('keydown', function (e) {
+      if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || etat.vue !== 'detail' || !etat.courant || etat.courant.images.length < 2) return;
+      if (!$('cart-modal').hidden || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '')) return;
+      montrerPhoto(etat.photo + (e.key === 'ArrowRight' ? 1 : -1));
+    });
+    window.addEventListener('hashchange', function () { if (etat.parCode) surNavigation(); });
     if ('ResizeObserver' in window) new ResizeObserver(mesurerHaut).observe($('top-fixed'));
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     demarrer();
