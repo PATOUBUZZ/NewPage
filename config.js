@@ -1,5 +1,5 @@
 /* ============================================================================
-   config.js — VERSION 2 — LE SEUL FICHIER À PERSONNALISER pour chaque nouvelle boutique
+   config.js — VERSION 3 — LE SEUL FICHIER À PERSONNALISER pour chaque nouvelle boutique
    (le nom, le logo, la description, le WhatsApp… se règlent ensuite depuis
     l'espace propriétaire « vendeur.html », sans toucher au code).
    ============================================================================ */
@@ -22,12 +22,14 @@ window.NB_CONFIG = {
   devise: 'FCFA',            // texte affiché après les prix
   lotAffichage: 12,          // nombre de produits ajoutés à chaque défilement (chargement progressif)
   vitesseBande: 45,          // vitesse de la bande défilante en haut (pixels par seconde)
+  delaiCarrousel: 5000,      // V3 : temps (en millisecondes) entre deux diapositives du carrousel (5000 = 5 secondes)
 
   /* ── 3 bis) WHATSAPP DU DÉVELOPPEUR (boutons « Notifiez-nous » / « Contactez-nous » de l'espace propriétaire)
         Format international sans + ni espaces, ex. '22961000000'. Laissez '' pour masquer la barre.      */
   whatsappSupport: '22961196907',
 
   /* ── 4) RÉGLAGES AVANCÉS ────────────────────────────────────────────────────  */
-  cleCache: 'nb_cache_v2',   // nom de la mémoire du navigateur (changez-le pour forcer une mise à jour chez tous)
-  cleePanier: 'nb_panier_v1'
+  cleCache: 'nb_cache_v3',   // nom de la mémoire du navigateur (changez-le pour forcer une mise à jour chez tous)
+  cleePanier: 'nb_panier_v1',
+  cleCommandes: 'nb_cmd_attente_v3'   // V3 : commandes dont la notification n'a pas pu partir (réseau coupé) : renvoyées automatiquement
 };

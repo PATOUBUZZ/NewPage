@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Espace vendeur · V2</title>
+  <title>Espace vendeur · V3</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0B1F4D">
 
@@ -154,6 +154,21 @@
       </h3>
       <div id="products-list" class="space-y-3" aria-live="polite"></div>
 
+      <!-- ═════ V3 : COMMANDES REÇUES ═════ -->
+      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
+        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-receipt text-deal"></i> Commandes reçues <span id="cmd-count" class="text-xs font-bold text-orange-600"></span></h3>
+      </div>
+      <p class="text-xs text-slate-500 -mt-1 mb-3">Chaque commande validée par un client est enregistrée ici (les 30 dernières) et vous est aussi envoyée par Telegram / webhook si vous l'avez configuré plus bas.</p>
+      <div id="cmd-list" class="space-y-2" aria-live="polite"></div>
+
+      <!-- ═════ V3 : CARROUSEL PROMOTIONNEL ═════ -->
+      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
+        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-images text-deal"></i> Carrousel promotionnel <span id="slide-count" class="text-xs font-bold text-slate-400"></span></h3>
+        <button id="btn-add-slide" type="button" class="prod-act prod-edit disabled:opacity-50"><i class="fas fa-plus"></i> Ajouter</button>
+      </div>
+      <p class="text-xs text-slate-500 -mt-1 mb-3">3 diapositives maximum (image + titre + texte + lien de redirection). Elles défilent en boucle sous l'en-tête de votre site pour mettre vos promotions en avant.</p>
+      <div id="slide-list" class="space-y-2" aria-live="polite"></div>
+
       <!-- Bande défilante -->
       <div class="mt-7 mb-3 flex items-center justify-between gap-2">
         <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-bullhorn text-deal"></i> Bande défilante <span id="ann-count" class="text-xs font-bold text-slate-400"></span></h3>
@@ -182,6 +197,22 @@
           <button id="btn-cover-remove" type="button" class="action-btn action-btn-ghost disabled:opacity-50"><i class="fas fa-trash"></i> Retirer</button>
         </div>
         <p id="cover-error" class="form-error hidden mt-3" role="alert"></p>
+      </div>
+
+      <!-- ═════ V3 : NOTIFICATIONS DE COMMANDES (Telegram / webhook) ═════ -->
+      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-bell text-deal"></i> Notifications de commandes</h3>
+      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-sm">
+        <dl class="space-y-2">
+          <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Telegram</dt><dd id="ns-tg" class="min-w-0 break-words">—</dd></div>
+          <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Webhook</dt><dd id="ns-wh" class="min-w-0 break-words">—</dd></div>
+          <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Envoi</dt><dd id="ns-actif" class="min-w-0 break-words">—</dd></div>
+        </dl>
+        <p id="notif-warn" class="form-error hidden mt-3"></p>
+        <div class="grid grid-cols-2 gap-2 mt-4">
+          <button id="btn-notif-edit" type="button" class="action-btn"><i class="fas fa-cog"></i> Configurer</button>
+          <button id="btn-notif-test" type="button" class="action-btn action-btn-ghost"><i class="fas fa-paper-plane"></i> Envoyer un test</button>
+        </div>
+        <p id="notif-test-result" class="hidden mt-3 text-sm font-semibold whitespace-pre-line break-words"></p>
       </div>
 
       <!-- Informations de la boutique -->
@@ -360,6 +391,83 @@
         <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="a-visible" type="checkbox" class="w-5 h-5 accent-brand" checked> Affiché sur le site</label>
         <p id="ann-error" class="form-error hidden"></p>
         <button id="btn-ann-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== V3 : MODALE : DIAPOSITIVE DU CARROUSEL ===== -->
+  <div id="modal-slide" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="slide-title">
+    <div class="modal-panel">
+      <button id="btn-slide-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
+      <h2 id="slide-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Nouvelle diapositive</h2>
+      <form id="form-slide" class="space-y-4 mt-4" novalidate>
+        <div>
+          <p class="field-label"><i class="fas fa-image"></i> Image <span class="font-normal text-slate-400">(facultative — sans image : dégradé de la couleur de la boutique)</span></p>
+          <!-- Aperçu fidèle : image + filtre sombre + texte -->
+          <div class="slide-preview">
+            <img id="slide-img" class="hidden" alt="Aperçu de l'image de la diapositive">
+            <div class="slide-shade" aria-hidden="true"></div>
+            <div class="slide-prev-text"><strong id="sp-titre">Votre titre</strong><span id="sp-texte">Votre texte promotionnel</span></div>
+          </div>
+          <input id="s-photo" type="file" accept="image/*" class="hidden">
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <label for="s-photo" class="action-btn"><i class="fas fa-camera"></i> <span id="btn-slide-img-label">Choisir une image</span></label>
+            <button id="btn-slide-img-remove" type="button" class="action-btn action-btn-ghost disabled:opacity-50"><i class="fas fa-trash"></i> Retirer</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Image large (paysage) recommandée. Elle est allégée automatiquement.</p>
+        </div>
+        <div>
+          <label class="field-label" for="s-titre">Titre <span id="s-titre-count" class="font-normal text-slate-400">0 / 60</span></label>
+          <input class="field" id="s-titre" type="text" maxlength="60" placeholder="Ex : 🔥 Soldes -30 % ce week-end">
+        </div>
+        <div>
+          <label class="field-label" for="s-texte">Texte <span id="s-texte-count" class="font-normal text-slate-400">0 / 140</span></label>
+          <textarea class="field" id="s-texte" rows="2" maxlength="140" placeholder="Ex : Livraison gratuite dès 2 articles"></textarea>
+        </div>
+        <div>
+          <label class="field-label" for="s-lien"><i class="fas fa-link"></i> Lien de redirection <span class="font-normal text-slate-400">(facultatif)</span></label>
+          <input class="field" id="s-lien" type="text" maxlength="500" placeholder="https://wa.me/22961000000 ou https://…">
+          <p class="text-xs text-slate-500 mt-1">Au toucher, le client est redirigé vers ce lien (WhatsApp, une page, un produit de la boutique…). Il doit commencer par https://</p>
+        </div>
+        <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="s-visible" type="checkbox" class="w-5 h-5 accent-brand" checked> Affichée sur le site</label>
+        <p id="slide-error" class="form-error hidden" role="alert"></p>
+        <button id="btn-slide-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== V3 : MODALE : NOTIFICATIONS (Telegram / webhook) ===== -->
+  <div id="modal-notif" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="notif-title">
+    <div class="modal-panel">
+      <button id="btn-notif-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
+      <h2 id="notif-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Notifications de commandes</h2>
+      <form id="form-notif" class="space-y-4 mt-4" novalidate>
+        <div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-900 leading-relaxed">
+          <p class="font-bold mb-1"><i class="fab fa-telegram mr-1"></i> Créer votre bot Telegram (2 minutes)</p>
+          <ol class="list-decimal pl-4 space-y-0.5">
+            <li>Dans Telegram, ouvrez <strong>@BotFather</strong> → envoyez <strong>/newbot</strong> → choisissez un nom. Copiez le <strong>jeton</strong> reçu.</li>
+            <li>Ouvrez votre nouveau bot et envoyez-lui <strong>/start</strong> (obligatoire, sinon il ne peut pas vous écrire).</li>
+            <li>Ouvrez <strong>@userinfobot</strong> : il vous donne votre <strong>Chat ID</strong> (un nombre). Pour un groupe : ajoutez le bot au groupe ; le Chat ID commence par un « - ».</li>
+          </ol>
+        </div>
+        <div>
+          <label class="field-label" for="n-token"><i class="fab fa-telegram"></i> Jeton du bot (token)</label>
+          <input class="field" id="n-token" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="123456789:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+          <p id="n-token-hint" class="text-xs text-slate-500 mt-1">Le jeton est enregistré de façon privée dans la base : il n'est jamais affiché ni relu par cette page.</p>
+        </div>
+        <div>
+          <label class="field-label" for="n-chat"><i class="fas fa-id-badge"></i> Chat ID Telegram</label>
+          <input class="field" id="n-chat" type="text" inputmode="numeric" autocomplete="off" maxlength="40" placeholder="Ex : 123456789">
+        </div>
+        <div>
+          <label class="field-label" for="n-webhook"><i class="fas fa-plug"></i> Webhook <span class="font-normal text-slate-400">(facultatif)</span></label>
+          <input class="field" id="n-webhook" type="url" autocomplete="off" maxlength="500" placeholder="https://hook.eu1.make.com/…">
+          <p class="text-xs text-slate-500 mt-1">Chaque commande est aussi envoyée (JSON) à cette adresse : Make, Zapier, n8n… (ex. pour recevoir un e-mail). https:// obligatoire.</p>
+        </div>
+        <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="n-actif" type="checkbox" class="w-5 h-5 accent-brand" checked> Envoyer les notifications de commandes</label>
+        <p id="notif-error" class="form-error hidden" role="alert"></p>
+        <button id="btn-notif-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
+        <button id="btn-notif-clear" type="button" class="action-btn action-btn-ghost hidden"><i class="fas fa-trash"></i> Retirer le bot Telegram</button>
       </form>
     </div>
   </div>

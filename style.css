@@ -1,5 +1,6 @@
 /* ============================================================================
-   style.css — Nya-Boutique V2 (site visiteur). Mobile d'abord, grille 2×2, en-tête 20vh avec image de couverture.
+   style.css — Nya-Boutique V3 (site visiteur). Mobile d'abord, grille 2×2, en-tête 20vh avec image de couverture,
+   carrousel promotionnel infini de 20vh sous l'en-tête.
    La couleur principale vient de config.js (variable --brand).
    ============================================================================ */
 :root {
@@ -269,3 +270,39 @@ main { padding: calc(var(--top-h) + 12px) 12px 28px; max-width: 760px; margin: 0
 .geo-status.ok { color: #047857; font-weight: 700; }
 .geo-status.ko { color: #b91c1c; }
 .geo-status button { background: none; border: 0; padding: 0 0 0 6px; color: #1d4ed8; text-decoration: underline; font: inherit; cursor: pointer; }
+
+/* ───────── V3 : carrousel promotionnel infini (1/5 de l'écran = 20vh) ─────────
+   • .promo : cadre de 20vh, juste sous l'en-tête fixe (il défile avec la page).
+   • .promo-track : bande horizontale déplacée par transform (voir app.js : diapositives clonées aux 2 bouts = boucle infinie).
+   • .promo-shade : filtre sombre en dégradé sur chaque image → texte toujours lisible. */
+.promo {
+  position: relative; height: 20vh; margin: 0 0 12px; border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: var(--sh-1); background: var(--brand-dark); touch-action: pan-y; -webkit-user-select: none; user-select: none;
+}
+.promo-track { display: flex; width: 100%; height: 100%; will-change: transform; }
+.promo-slide {
+  position: relative; flex: 0 0 100%; height: 100%; display: flex; align-items: flex-end; overflow: hidden; color: #fff; text-decoration: none;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);          /* diapositive sans image */
+}
+.promo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; pointer-events: none; }
+.promo-shade {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(8,15,32,.80) 0%, rgba(8,15,32,.48) 55%, rgba(8,15,32,.14) 100%),
+              linear-gradient(0deg, rgba(8,15,32,.55) 0%, rgba(8,15,32,0) 60%);
+}
+.promo-text { position: relative; z-index: 1; max-width: 80%; padding: 10px 16px 28px; display: flex; flex-direction: column; gap: 3px; text-shadow: 0 2px 8px rgba(0,0,0,.55); }
+.promo-title {
+  margin: 0; font-size: clamp(.98rem, 4.2vw, 1.4rem); font-weight: 800; line-height: 1.15;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.promo-desc {
+  margin: 0; font-size: .84rem; line-height: 1.3; opacity: .96;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.promo-cta { align-self: flex-start; margin-top: 4px; padding: 3px 11px; border-radius: 999px; background: var(--amber); color: #1f1300; font-size: .74rem; font-weight: 800; text-shadow: none; }
+.promo-dots { position: absolute; left: 0; right: 0; bottom: 8px; z-index: 3; display: flex; justify-content: center; gap: 7px; pointer-events: none; }
+.promo-dot { position: relative; width: 8px; height: 8px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,255,255,.55); pointer-events: auto; transition: width .25s, background .25s; }
+.promo-dot::after { content: ''; position: absolute; inset: -9px -5px; }                /* zone de toucher agrandie */
+.promo-dot.active { width: 22px; background: #fff; }
+@media (max-height: 520px) { .promo-desc { display: none; } .promo-text { padding-bottom: 22px; } }
+@media (min-width: 700px) { .promo-title { font-size: 1.5rem; } .promo-desc { font-size: .95rem; } }

@@ -49,6 +49,14 @@
 
     <!-- ═════ VUE 1 : GRILLE 2×2 de tous les produits ═════ -->
     <section id="grid-view" aria-label="Produits">
+
+      <!-- ═════ V3 : CARROUSEL PROMOTIONNEL INFINI (jusqu'à 3 diapositives, 1/5 de l'écran, juste sous l'en-tête fixe) ═════
+           Rempli par app.js depuis la table « carrousel ». Masqué automatiquement s'il n'y a aucune diapositive visible. -->
+      <div class="promo" id="promo" hidden role="region" aria-roledescription="carrousel" aria-label="Promotions de la boutique">
+        <div class="promo-track" id="promo-track"></div>
+        <div class="promo-dots" id="promo-dots"></div>
+      </div>
+
       <div class="grid" id="grid" aria-live="polite"></div>
       <div id="sentinel" aria-hidden="true"></div>
       <div class="state-msg" id="state-msg" hidden></div>
