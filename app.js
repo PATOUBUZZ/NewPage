@@ -1,9 +1,9 @@
 /* ============================================================================
-   app.js — Site visiteur de la boutique unique
+   app.js — Site visiteur de la boutique unique (VERSION 2 : en-tête 20vh avec image de couverture)
    ----------------------------------------------------------------------------
    1. Charge boutique + produits visibles + annonces depuis Supabase (API REST publique, lecture seule),
       avec un CACHE navigateur de config.cacheMinutes minutes (5 par défaut).
-   2. Bande défilante infinie (annonces) + en-tête fixe (logo, nom, panier).
+   2. En-tête fixe de 20vh : IMAGE DE COUVERTURE du vendeur (boutique.cover_url) + filtre sombre + bande défilante infinie (annonces) + logo, nom, panier.
    3. Grille 2×2, produits MÉLANGÉS à chaque chargement (sauf si boutique.melange_actif = false), affichage progressif
       par lots (lazy loading : les lots suivants se chargent au défilement, images en loading="lazy").
    4. Vue détail : galerie jusqu'à 4 photos, description, caractéristiques, boutons Commander / Ajouter au panier / Partager,
@@ -82,7 +82,10 @@
   }
   function telecharger() {
     return Promise.all([
-      rest('boutique?select=*&id=eq.1')       /* « * » : fonctionne même si une colonne récente (couverture…) n'existe pas encore */,
+      // V2 : on demande aussi « cover_url ». Si le script SQL/4-v2-couverture.sql n'a pas encore été lancé, la colonne n'existe pas :
+      // on retombe alors sur la requête de la V1 (le site continue de fonctionner, simplement sans couverture).
+      rest('boutique?select=nom,proprietaire,description,ville,localisation,whatsapp,logo_url,melange_actif,cover_url&id=eq.1')
+        .catch(function () { return rest('boutique?select=nom,proprietaire,description,ville,localisation,whatsapp,logo_url,melange_actif&id=eq.1'); }),
       rest('produits?select=id,nom,prix,ancien_prix,description,caracteristiques,plus_infos,images,ordre,cree_le&visible=eq.true&order=ordre.asc,cree_le.desc&limit=1000'),
       rest('annonces?select=id,message,lien&visible=eq.true&order=ordre.asc,cree_le.asc')
     ]).then(function (r) { return { t: Date.now(), boutique: r[0][0] || {}, produits: r[1] || [], annonces: r[2] || [] }; });
@@ -108,6 +111,7 @@
     var nom = b.nom || 'Boutique';
     $('brand-name').textContent = nom;
     logo($('brand-logo'), b);
+    appliquerCouverture(b);
     document.title = nom;
     var og = document.querySelector('meta[property="og:title"]'); if (og) og.setAttribute('content', nom);
     var desc = (b.description || '').slice(0, 160);
@@ -116,19 +120,20 @@
       var od = document.querySelector('meta[property="og:description"]'); if (od) od.setAttribute('content', desc);
     }
     var u = NB.urlImage(b.logo_url); if (u) $('favicon').setAttribute('href', u);
-    appliquerCouverture(b.couverture_url);
   }
 
-  /* V2 — Image de couverture de l'en-tête fixe : le nom de la boutique et le panier se superposent par-dessus.
-     L'image se règle depuis l'espace vendeur (ou boutique.couverture_url dans Supabase). Sans image : en-tête dégradé habituel. */
-  function appliquerCouverture(url) {
-    var hd = document.querySelector('.site-header'), u = NB.urlImage(url);
-    function retirer() { hd.classList.remove('has-cover'); hd.style.removeProperty('--cover'); mesurerHaut(); }
-    if (!u) return retirer();
-    var test = new Image();
-    test.onload = function () { hd.style.setProperty('--cover', 'url("' + u.replace(/["\\()\s]/g, function (c) { return '%' + ('0' + c.charCodeAt(0).toString(16)).slice(-2).toUpperCase(); }) + '")'); hd.classList.add('has-cover'); mesurerHaut(); };
-    test.onerror = retirer;                                    // image introuvable : on garde l'en-tête classique
-    test.src = u;
+  /** V2 — Image de couverture de l'en-tête : <img> créée par DOM (aucune injection possible), https uniquement.
+      La classe « has-cover » active le filtre sombre renforcé (style.css) pour garder le texte lisible. */
+  function appliquerCouverture(b) {
+    var zone = $('header-cover'), entete = $('site-header');
+    zone.textContent = ''; entete.classList.remove('has-cover');
+    var u = NB.urlImage(b.cover_url);
+    if (!u) return;                                               // pas de couverture : dégradé de la couleur de la boutique
+    var im = el('img', { src: u, alt: '', decoding: 'async', fetchpriority: 'high' });
+    im.onload = function () { entete.classList.add('has-cover'); };
+    im.onerror = function () { zone.textContent = ''; entete.classList.remove('has-cover'); };   // image cassée : on revient au dégradé
+    zone.appendChild(im);
+    if (im.complete && im.naturalWidth) entete.classList.add('has-cover');
   }
 
   function construireBande(annonces) {
@@ -183,9 +188,7 @@
 
   /** Hauteur de la zone fixe (bande + en-tête) → marge haute de la page */
   function mesurerHaut() {
-    var t = $('top-fixed');
-    if (t.classList.contains('compact')) return;              // en-tête réduit pendant le défilement : on garde la hauteur complète mesurée avant
-    var h = t.offsetHeight;
+    var h = $('top-fixed').offsetHeight;
     if (h) document.documentElement.style.setProperty('--top-h', h + 'px');
   }
 
@@ -529,20 +532,8 @@
       e.preventDefault(); ouvrirProduit(a.getAttribute('data-id'), true);
     });
     window.addEventListener('popstate', surNavigation);
-    // V2 — En-tête avec couverture : il se réduit quand on fait défiler la page (plus de place pour les produits)
-    var tickScroll = false;
-    window.addEventListener('scroll', function () {
-      if (tickScroll) return; tickScroll = true;
-      window.requestAnimationFrame(function () { tickScroll = false; $('top-fixed').classList.toggle('compact', window.pageYOffset > 70); });
-    }, { passive: true });
-    window.addEventListener('resize', mesurerHaut);
-    // V2 — Ordinateur : flèches ← → du clavier pour changer de photo dans la vue détail
-    document.addEventListener('keydown', function (e) {
-      if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || etat.vue !== 'detail' || !etat.courant || etat.courant.images.length < 2) return;
-      if (!$('cart-modal').hidden || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '')) return;
-      montrerPhoto(etat.photo + (e.key === 'ArrowRight' ? 1 : -1));
-    });
     window.addEventListener('hashchange', function () { if (etat.parCode) surNavigation(); });
+    window.addEventListener('resize', mesurerHaut);
     if ('ResizeObserver' in window) new ResizeObserver(mesurerHaut).observe($('top-fixed'));
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     demarrer();
