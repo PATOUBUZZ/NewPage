@@ -1,5 +1,5 @@
 /* ============================================================================
-   app.js — Site visiteur de la boutique unique (VERSION 3 : en-tête 20vh + carrousel infini + notification de commande)
+   app.js — Site visiteur de la boutique unique (VERSION 4 = V3 : en-tête 20vh + carrousel infini + notification de commande ; la multi-administration se pilote dans vendeur.html)
    ----------------------------------------------------------------------------
    1. Charge boutique + produits visibles + annonces depuis Supabase (API REST publique, lecture seule),
       avec un CACHE navigateur de config.cacheMinutes minutes (5 par défaut).

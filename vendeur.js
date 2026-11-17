@@ -1,5 +1,5 @@
 /* ============================================================================
-   vendeur.js — VERSION 3 — Espace vendeur (vendeur.html) — même interface que l'ancien espace vendeur Nya-Market,
+   vendeur.js — VERSION 4 — Espace vendeur (vendeur.html) — même interface que l'ancien espace vendeur Nya-Market,
    SANS documents ni selfie.
    ----------------------------------------------------------------------------
    • Connexion Google ; accès UNIQUEMENT si le Gmail est dans la table « proprietaires » (fonction SQL est_proprietaire()).
@@ -14,6 +14,8 @@
    • V2 : IMAGE DE COUVERTURE de l'en-tête du site (boutique.cover_url) : choisir / changer / retirer, avec compression automatique.
    • V3 : CARROUSEL promotionnel (3 diapositives : image, titre, texte, lien, ordre, visibilité), COMMANDES reçues (liste, traitée / non traitée),
           NOTIFICATIONS de commande (bot Telegram + webhook : réglages privés enregistrés par des fonctions SQL, jeton jamais relu).
+   • V4 : MULTI-ADMINISTRATEURS (5 profils maximum). Rôles « principal » (gère admins + bot) et « admin ». Chaque admin a son nom et son
+          Telegram. Toutes les règles sont appliquées par Supabase (fonctions SQL) : cette page ne fait qu'afficher les boutons autorisés.
    Toutes les données du vendeur sont échappées (esc) avant affichage : aucune injection HTML possible.
    ============================================================================ */
 (function () {
@@ -24,15 +26,17 @@
   var DEFAUT_MAX = 16;                         // doit rester identique à la valeur par défaut du SQL
   var MAX_PHOTOS = 4;
   var MAX_ANNONCES = 10;
+  var MAX_ADMINS = 5;                          // V4 : profils administrateurs (doit rester identique au SQL)
   var MAX_SLIDES = 3;                          // V3 : diapositives du carrousel (doit rester identique au SQL)
-  var MODALES_SIMPLES = ['modal-loc', 'modal-shop', 'modal-ann', 'modal-slide', 'modal-notif'];   // fermées par clic sur le fond ou la touche Échap
+  var MODALES_SIMPLES = ['modal-loc', 'modal-shop', 'modal-ann', 'modal-slide', 'modal-notif', 'modal-adm-add', 'modal-adm-edit'];   // fermées par clic sur le fond ou la touche Échap
   var SEUIL_SANS_COMPRESSION = 120 * 1024;     // ≤ 120 Ko : on n'y touche pas
   var CIBLE_MAX = 130 * 1024;                  // > 120 Ko : on vise ≤ 130 Ko
   var QUALITE_MIN = 0.72;                      // en dessous, on préfère réduire un peu les dimensions
 
   var sb = null;
   var S = { session: null, boutique: {}, produits: [], annonces: [], photos: [], editId: null, editAnn: null, chargeUne: false, dernierRefresh: 0,
-            slides: [], commandes: [], notif: null, manque: {}, editSlide: null, slideImg: null };
+            slides: [], commandes: [], notif: null, manque: {}, editSlide: null, slideImg: null,
+            admins: [], moi: null, editAdm: null };
 
   /* ───────────────────────────── Utilitaires ───────────────────────────── */
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -47,6 +51,7 @@
   function uuid() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }); }
   function octets(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko'; }
   function invaliderCache() { NB.effacer(cfg.cleCache); }
+  function estPrincipal() { return !!(S.moi && S.moi.role === 'principal'); }       // V4 : simple confort d'affichage (la vraie règle est dans Supabase)
   function limite() { var m = parseInt(S.boutique && S.boutique.max_produits, 10); return m > 0 ? m : DEFAUT_MAX; }
   function fcfa(n) { return Number(n || 0).toLocaleString('fr-FR') + ' ' + cfg.devise; }
   function pourcent(normal, promo) { return Math.round((1 - promo / normal) * 100); }
@@ -232,17 +237,20 @@
       sb.from('annonces').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true }),
       doux('carrousel', sb.from('carrousel').select('*').order('ordre', { ascending: true }).order('cree_le', { ascending: true })),
       doux('commandes', sb.from('commandes').select('*').order('cree_le', { ascending: false }).limit(30)),
-      doux('notif', sb.rpc('notif_statut'))
+      doux('notif', sb.rpc('notif_statut')),
+      doux('admins', sb.rpc('admins_lister')),
+      doux('profil', sb.rpc('mon_profil'))
     ]).then(function (r) {
       for (var i = 0; i < 3; i++) if (r[i].error) throw r[i].error;
       S.boutique = r[0].data || {}; S.produits = r[1].data || []; S.annonces = r[2].data || [];
       S.slides = r[3].data || []; S.commandes = r[4].data || []; S.notif = r[5].data || null;
+      S.admins = Array.isArray(r[6].data) ? r[6].data : []; S.moi = r[7].data || null;
       S.chargeUne = true;
       dessinerTout();
     });
   }
 
-  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerCommandes(); dessinerCarrousel(); dessinerAnnonces(); dessinerCouverture(); dessinerNotif(); majContacts(); }
+  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerCommandes(); dessinerCarrousel(); dessinerAnnonces(); dessinerCouverture(); dessinerNotif(); dessinerMoi(); dessinerAdmins(); majContacts(); }
 
   /* ───────────────────────────── Carte boutique ───────────────────────────── */
   function urlBoutique() { return location.origin + location.pathname.replace(/[^\/]*$/, ''); }
@@ -826,30 +834,36 @@
 
   /* ───────────────────────────── V3 : notifications de commandes ───────────────────────────── */
   function dessinerNotif() {
-    var n = S.notif, ok = !S.manque.notif && !!n;
+    var n = S.notif, ok = !S.manque.notif && !!n, princ = estPrincipal();
+    $('btn-notif-edit').classList.toggle('hidden', !princ);              // seul le principal règle le bot et le webhook
+    $('btn-notif-test').classList.toggle('col-span-2', !princ);
     $('btn-notif-edit').disabled = !ok; $('btn-notif-test').disabled = !ok;
     var avert = $('notif-warn');
     if (!ok) {
       $('ns-tg').textContent = '—'; $('ns-wh').textContent = '—'; $('ns-actif').textContent = '—';
-      avert.textContent = 'Section indisponible : lancez SQL/5-v3-carrousel-commandes.sql dans Supabase.'; avert.classList.remove('hidden');
+      avert.textContent = 'Section indisponible : lancez SQL/5 puis SQL/6 dans Supabase.'; avert.classList.remove('hidden');
       return;
     }
-    $('ns-tg').textContent = n.telegram ? '✅ Connecté (Chat ID ' + n.chat_id + ', jeton …' + n.token_fin + ')' : '⚠️ Non configuré';
+    if (!n.bot) $('ns-tg').textContent = '⚠️ Bot non configuré';
+    else if (!n.destinataires) $('ns-tg').textContent = '⚠️ Bot connecté, mais aucun destinataire (ajoutez un Chat ID)';
+    else $('ns-tg').textContent = '✅ Bot connecté · ' + n.destinataires + ' destinataire' + (n.destinataires > 1 ? 's' : '') + ' Telegram' + (n.token_fin ? ' (jeton …' + n.token_fin + ')' : '');
     var hote = ''; if (n.webhook) { try { hote = new URL(n.webhook).host; } catch (e) { hote = 'adresse enregistrée'; } }
-    $('ns-wh').textContent = n.webhook ? '✅ ' + hote : '— (facultatif)';
+    $('ns-wh').textContent = n.webhook_actif ? '✅ ' + (hote || 'configuré') : '— (facultatif)';
     $('ns-actif').textContent = n.actif ? 'Activé' : '⏸ Désactivé : aucun message n’est envoyé';
-    var rien = !n.telegram && !n.webhook;
-    avert.textContent = rien ? 'Aucune notification configurée : touchez « Configurer » pour recevoir vos commandes sur Telegram. En attendant, elles restent visibles dans « Commandes reçues » et arrivent toujours sur votre WhatsApp.' : '';
+    var rien = !(n.bot && n.destinataires) && !n.webhook_actif;
+    avert.textContent = rien ? (princ ? 'Aucune notification active : touchez « Configurer » (jeton du bot), puis ajoutez un Chat ID (le vôtre ci-dessous dans « Administrateurs »). En attendant, les commandes restent visibles dans « Commandes reçues » et arrivent toujours sur WhatsApp.'
+                                       : 'Aucune notification active : demandez à l’administrateur principal de configurer le bot.') : '';
     avert.classList.toggle('hidden', !rien);
   }
 
   function ouvrirNotif() {
+    if (!estPrincipal()) return;
     var n = S.notif || {};
     $('n-token').value = ''; $('n-chat').value = n.chat_id || ''; $('n-webhook').value = n.webhook || ''; $('n-actif').checked = n.actif !== false;
-    $('n-token-hint').textContent = n.telegram
+    $('n-token-hint').textContent = n.bot
       ? 'Un jeton est déjà enregistré (…' + n.token_fin + '). Laissez ce champ vide pour le conserver, ou collez-en un nouveau pour le remplacer.'
       : 'Le jeton est enregistré de façon privée dans la base : il n’est jamais affiché ni relu par cette page.';
-    $('btn-notif-clear').classList.toggle('hidden', !n.telegram);
+    $('btn-notif-clear').classList.toggle('hidden', !n.bot);
     erreur('notif-error', ''); ouvrirModal('modal-notif');
   }
 
@@ -860,8 +874,6 @@
       if (token && !/^[0-9]{6,12}:[A-Za-z0-9_-]{30,50}$/.test(token)) return erreur('notif-error', 'Jeton invalide : copiez-le tel quel depuis @BotFather (ex. 123456789:AAxxxxxxxx…).');
       if (chat && !/^(-?[0-9]{5,20}|@[A-Za-z0-9_]{5,32})$/.test(chat)) return erreur('notif-error', 'Chat ID invalide : un nombre (ex. 123456789, négatif pour un groupe) ou @nom_du_canal.');
       if (hook && !/^https:\/\//i.test(hook)) return erreur('notif-error', 'Le webhook doit commencer par https://');
-      if ((token || (S.notif && S.notif.telegram)) && !chat) return erreur('notif-error', 'Indiquez votre Chat ID Telegram.');
-      if (chat && !token && !(S.notif && S.notif.telegram)) return erreur('notif-error', 'Indiquez le jeton de votre bot Telegram.');
     }
     var btn = $('btn-notif-submit'); occupeBtn(btn, true, 'Enregistrement…');
     sb.rpc('notif_enregistrer', { p_token: token, p_chat_id: vider ? '' : chat, p_webhook: hook, p_actif: $('n-actif').checked, p_vider_token: !!vider })
@@ -891,6 +903,90 @@
         return '❌ ' + nom + ' : échec (code ' + (rr.status || 'aucune réponse') + '). ' + (rr.extrait || '');
       }).join('\n'));
     }).catch(function (e) { montrer('❌ ' + messageErreur(e)); }).then(function () { occupe(false); });
+  }
+
+  /* ───────────────────────────── V4 : administrateurs ───────────────────────────── */
+  function dessinerMoi() {
+    var m = S.moi, e = $('me-badge');
+    e.textContent = m ? '👤 Connecté : ' + (m.nom || m.email) + ' · ' + (m.role === 'principal' ? 'Administrateur principal' : 'Administrateur') : '';
+  }
+
+  function dessinerAdmins() {
+    var liste = $('adm-list'), princ = estPrincipal(), n = S.admins.length, moi = (S.moi && S.moi.email) || '';
+    $('adm-count').textContent = S.manque.admins ? '' : '(' + n + '/' + MAX_ADMINS + ')';
+    $('btn-add-admin').classList.toggle('hidden', !princ);
+    $('btn-add-admin').disabled = n >= MAX_ADMINS;
+    $('adm-rule').textContent = princ ? 'Vous êtes l’administrateur principal : vous pouvez ajouter, suspendre ou retirer des administrateurs.'
+                                      : 'Seul l’administrateur principal ajoute ou retire des administrateurs. Vous pouvez modifier votre propre profil.';
+    if (S.manque.admins) {
+      liste.innerHTML = '<p class="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-sm text-slate-500">Section indisponible : lancez <strong>SQL/6-v4-multi-admins.sql</strong> dans Supabase.</p>';
+      return;
+    }
+    liste.innerHTML = S.admins.map(function (a) {
+      var moiMeme = a.email === moi;
+      return '<article class="ann-card' + (a.actif ? '' : ' off') + '" data-email="' + esc(a.email) + '">' +
+        '<div class="min-w-0 flex-1">' +
+          '<p class="font-bold text-sm break-words">' + esc(a.nom || '(sans nom)') + ' ' +
+            (a.role === 'principal' ? '<span class="badge badge-principal"><i class="fas fa-crown"></i> Principal</span> ' : '') +
+            (moiMeme ? '<span class="badge badge-vous">Vous</span> ' : '') +
+            (a.actif ? '' : '<span class="badge badge-off"><i class="fas fa-ban"></i> Suspendu</span> ') +
+            (a.telegram ? '<span class="badge badge-tg"><i class="fab fa-telegram"></i> Telegram</span>' : '') + '</p>' +
+          '<p class="text-xs text-slate-500 break-all mt-0.5">' + esc(a.email) + '</p>' +
+          '<div class="flex flex-wrap gap-2 mt-2">' +
+            ((princ || moiMeme) ? '<button type="button" class="prod-act prod-edit" data-ad="edit"><i class="fas fa-pen"></i> ' + (moiMeme ? 'Mon profil' : 'Modifier') + '</button>' : '') +
+            ((princ && !moiMeme) ? '<button type="button" class="prod-act prod-hide" data-ad="toggle"><i class="fas ' + (a.actif ? 'fa-ban' : 'fa-check') + '"></i> ' + (a.actif ? 'Suspendre' : 'Réactiver') + '</button>' : '') +
+            ((princ && !moiMeme) ? '<button type="button" class="prod-act prod-del" data-ad="delete"><i class="fas fa-user-minus"></i> Retirer</button>' : '') +
+          '</div></div></article>';
+    }).join('');
+  }
+
+  function clicAdmin(e) {
+    var b = e.target.closest('[data-ad]'); if (!b) return;
+    var card = b.closest('.ann-card'), a = S.admins.filter(function (x) { return x.email === card.dataset.email; })[0]; if (!a) return;
+    if (b.dataset.ad === 'edit') ouvrirAdmEdit(a);
+    if (b.dataset.ad === 'toggle') executer(sb.rpc('admin_modifier', { p_email: a.email, p_actif: !a.actif }), a.actif ? 'Administrateur suspendu.' : 'Administrateur réactivé ✓');
+    if (b.dataset.ad === 'delete' && window.confirm('Retirer ' + (a.nom || a.email) + ' ? Cette personne perd l’accès. Ses produits ne sont pas supprimés.'))
+      executer(sb.rpc('admin_retirer', { p_email: a.email }), 'Administrateur retiré.');
+  }
+
+  function ouvrirAdmAjout() {
+    if (S.admins.length >= MAX_ADMINS) { toast('Limite de ' + MAX_ADMINS + ' administrateurs atteinte.'); return; }
+    $('a-email').value = ''; $('a-nom').value = ''; erreur('adm-add-error', ''); ouvrirModal('modal-adm-add');
+  }
+  function enregistrerAdmAjout(ev) {
+    ev.preventDefault(); erreur('adm-add-error', '');
+    var email = $('a-email').value.trim().toLowerCase(), nom = $('a-nom').value.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return erreur('adm-add-error', 'Indiquez une adresse Gmail valide.');
+    var btn = $('btn-adm-add-submit'); occupeBtn(btn, true, 'Ajout…');
+    sb.rpc('admin_ajouter', { p_email: email, p_nom: nom })
+      .then(function (r) { if (r.error) throw r.error; return chargerTout(); })
+      .then(function () { fermerModal('modal-adm-add'); toast('Administrateur ajouté ✓ Il peut se connecter avec ce compte Google.'); })
+      .catch(function (e) { erreur('adm-add-error', 'Échec : ' + messageErreur(e)); })
+      .then(function () { occupeBtn(btn, false); });
+  }
+
+  function ouvrirAdmEdit(a) {
+    var moiMeme = !!(S.moi && a.email === S.moi.email), princ = estPrincipal();
+    S.editAdm = a.email;
+    $('adm-edit-title').textContent = moiMeme ? 'Mon profil' : 'Profil administrateur';
+    $('e-email').textContent = a.email; $('e-nom').value = a.nom || ''; $('e-chat').value = a.telegram_chat_id || '';
+    $('e-role').value = a.role; $('e-actif').checked = a.actif;
+    $('e-role-box').classList.toggle('hidden', !princ);
+    $('e-actif-box').classList.toggle('hidden', !princ || moiMeme);                 // on ne se suspend pas soi-même
+    erreur('adm-edit-error', ''); ouvrirModal('modal-adm-edit');
+  }
+  function enregistrerAdmEdit(ev) {
+    ev.preventDefault(); erreur('adm-edit-error', '');
+    var chat = $('e-chat').value.trim(), moiMeme = !!(S.moi && S.editAdm === S.moi.email), princ = estPrincipal();
+    if (chat && !/^(-?[0-9]{5,20}|@[A-Za-z0-9_]{5,32})$/.test(chat)) return erreur('adm-edit-error', 'Chat ID invalide : un nombre (ex. 123456789) ou @nom_du_canal.');
+    var args = { p_email: S.editAdm, p_nom: $('e-nom').value.trim(), p_chat_id: chat };
+    if (princ) { args.p_role = $('e-role').value; if (!moiMeme) args.p_actif = $('e-actif').checked; }
+    var btn = $('btn-adm-edit-submit'); occupeBtn(btn, true, 'Enregistrement…');
+    sb.rpc('admin_modifier', args)
+      .then(function (r) { if (r.error) throw r.error; return chargerTout(); })
+      .then(function () { fermerModal('modal-adm-edit'); toast('Profil enregistré ✓'); })
+      .catch(function (e) { erreur('adm-edit-error', 'Échec : ' + messageErreur(e)); })
+      .then(function () { occupeBtn(btn, false); });
   }
 
   /* ───────────────────────────── Démarrage ───────────────────────────── */
@@ -937,6 +1033,14 @@
     $('btn-ann-close').onclick = function () { fermerModal('modal-ann'); };
     $('a-msg').addEventListener('input', function () { $('a-count').textContent = $('a-msg').value.length + ' / 160'; });
     $('form-ann').addEventListener('submit', enregistrerAnnonce);
+
+    // V4 : administrateurs
+    $('btn-add-admin').onclick = ouvrirAdmAjout;
+    $('adm-list').addEventListener('click', clicAdmin);
+    $('btn-adm-add-close').onclick = function () { fermerModal('modal-adm-add'); };
+    $('btn-adm-edit-close').onclick = function () { fermerModal('modal-adm-edit'); };
+    $('form-adm-add').addEventListener('submit', enregistrerAdmAjout);
+    $('form-adm-edit').addEventListener('submit', enregistrerAdmEdit);
 
     // V3 : commandes, carrousel, notifications
     $('cmd-list').addEventListener('click', clicCommande);

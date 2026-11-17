@@ -193,3 +193,9 @@ label.action-btn { cursor: pointer; }
 .cmd-card summary::-webkit-details-marker { display: none; }
 .cmd-lines { margin: 8px 0 0; padding: 0; list-style: none; font-size: .82rem; color: #334155; }
 .cmd-lines li { padding: 3px 0; border-bottom: 1px dashed #E2E8F0; }
+
+/* ===== V4 : profils administrateurs ===== */
+.badge-principal { background: #E0E7FF; color: #3730A3; }
+.badge-vous { background: #DBEAFE; color: #1D4ED8; }
+.badge-tg { background: #E0F2FE; color: #0369A1; }
+select.field { appearance: auto; }

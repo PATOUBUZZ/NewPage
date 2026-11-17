@@ -1,5 +1,5 @@
 /* ============================================================================
-   config.js — VERSION 3 — LE SEUL FICHIER À PERSONNALISER pour chaque nouvelle boutique
+   config.js — VERSION 4 — LE SEUL FICHIER À PERSONNALISER pour chaque nouvelle boutique
    (le nom, le logo, la description, le WhatsApp… se règlent ensuite depuis
     l'espace propriétaire « vendeur.html », sans toucher au code).
    ============================================================================ */
@@ -29,7 +29,7 @@ window.NB_CONFIG = {
   whatsappSupport: '22961196907',
 
   /* ── 4) RÉGLAGES AVANCÉS ────────────────────────────────────────────────────  */
-  cleCache: 'nb_cache_v3',   // nom de la mémoire du navigateur (changez-le pour forcer une mise à jour chez tous)
+  cleCache: 'nb_cache_v4',   // nom de la mémoire du navigateur (changez-le pour forcer une mise à jour chez tous)
   cleePanier: 'nb_panier_v1',
   cleCommandes: 'nb_cmd_attente_v3'   // V3 : commandes dont la notification n'a pas pu partir (réseau coupé) : renvoyées automatiquement
 };

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Espace vendeur · V3</title>
+  <title>Espace vendeur · V4</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0B1F4D">
 
@@ -81,7 +81,7 @@
 
           <ul class="mt-6 space-y-3 text-sm text-slate-600">
             <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Vos produits sont publiés immédiatement, sans validation</li>
-            <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Accès réservé au Gmail du propriétaire</li>
+            <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Accès réservé aux administrateurs de la boutique (5 maximum), chacun avec son propre compte Google</li>
             <li class="flex gap-3"><i class="fas fa-check-circle text-ok mt-0.5"></i> Vos clients commandent directement sur WhatsApp</li>
           </ul>
         </div>
@@ -93,8 +93,8 @@
       <div class="rounded-3xl bg-white border border-slate-200 shadow-xl p-7 text-center">
         <div class="mx-auto w-14 h-14 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center text-2xl mb-4"><i class="fas fa-lock"></i></div>
         <h2 class="text-lg font-extrabold text-brand-navy">Accès refusé</h2>
-        <p class="mt-2 text-sm text-slate-600">Le compte <strong id="denied-email" class="break-all"></strong> n'est pas autorisé à gérer cette boutique.</p>
-        <p class="mt-2 text-xs text-slate-500">Connectez-vous avec l'adresse Gmail communiquée au développeur lors de la mise en place de votre boutique.</p>
+        <p class="mt-2 text-sm text-slate-600">Le compte <strong id="denied-email" class="break-all"></strong> n'est pas autorisé à gérer cette boutique (ou son accès a été désactivé).</p>
+        <p class="mt-2 text-xs text-slate-500">Connectez-vous avec le Gmail communiqué au développeur, ou demandez à l'administrateur principal de vous ajouter dans la section « Administrateurs ».</p>
         <button id="btn-denied-out" type="button" class="btn-main mt-5"><i class="fas fa-user-friends mr-2"></i> Changer de compte</button>
       </div>
     </section>
@@ -111,6 +111,7 @@
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ma boutique</p>
               <h2 id="shop-name" class="text-xl font-extrabold text-brand-navy truncate">—</h2>
               <p id="shop-account-status" class="mt-1"></p>
+              <p id="me-badge" class="mt-1 text-xs font-semibold text-slate-600"></p>
               <p class="mt-1 text-sm text-slate-600 flex items-center gap-1 flex-wrap">
                 <i class="fas fa-map-marker-alt text-brand"></i>
                 <span id="shop-location" class="min-w-0 break-words"></span>
@@ -208,12 +209,21 @@
           <div class="flex gap-2"><dt class="w-28 shrink-0 font-bold text-slate-500">Envoi</dt><dd id="ns-actif" class="min-w-0 break-words">—</dd></div>
         </dl>
         <p id="notif-warn" class="form-error hidden mt-3"></p>
+        <p class="text-xs text-slate-500 mt-3">Pour recevoir les commandes sur <strong>votre</strong> Telegram : ouvrez le bot, envoyez-lui <strong>/start</strong>, puis ajoutez votre Chat ID dans « Administrateurs → Modifier ».</p>
         <div class="grid grid-cols-2 gap-2 mt-4">
           <button id="btn-notif-edit" type="button" class="action-btn"><i class="fas fa-cog"></i> Configurer</button>
           <button id="btn-notif-test" type="button" class="action-btn action-btn-ghost"><i class="fas fa-paper-plane"></i> Envoyer un test</button>
         </div>
         <p id="notif-test-result" class="hidden mt-3 text-sm font-semibold whitespace-pre-line break-words"></p>
       </div>
+
+      <!-- ═════ V4 : ADMINISTRATEURS (5 profils maximum) ═════ -->
+      <div class="mt-7 mb-3 flex items-center justify-between gap-2">
+        <h3 class="font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-users-cog text-deal"></i> Administrateurs <span id="adm-count" class="text-xs font-bold text-slate-400"></span></h3>
+        <button id="btn-add-admin" type="button" class="prod-act prod-edit disabled:opacity-50 hidden"><i class="fas fa-user-plus"></i> Ajouter</button>
+      </div>
+      <p class="text-xs text-slate-500 -mt-1 mb-3">Jusqu'à 5 profils pilotent la boutique, chacun avec son propre compte Google. <span id="adm-rule"></span></p>
+      <div id="adm-list" class="space-y-2" aria-live="polite"></div>
 
       <!-- Informations de la boutique -->
       <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-info-circle text-deal"></i> Informations de la boutique</h3>
@@ -456,7 +466,7 @@
           <p id="n-token-hint" class="text-xs text-slate-500 mt-1">Le jeton est enregistré de façon privée dans la base : il n'est jamais affiché ni relu par cette page.</p>
         </div>
         <div>
-          <label class="field-label" for="n-chat"><i class="fas fa-id-badge"></i> Chat ID Telegram</label>
+          <label class="field-label" for="n-chat"><i class="fas fa-id-badge"></i> Chat ID Telegram principal <span class="font-normal text-slate-400">(facultatif si chaque administrateur renseigne le sien)</span></label>
           <input class="field" id="n-chat" type="text" inputmode="numeric" autocomplete="off" maxlength="40" placeholder="Ex : 123456789">
         </div>
         <div>
@@ -468,6 +478,54 @@
         <p id="notif-error" class="form-error hidden" role="alert"></p>
         <button id="btn-notif-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
         <button id="btn-notif-clear" type="button" class="action-btn action-btn-ghost hidden"><i class="fas fa-trash"></i> Retirer le bot Telegram</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== V4 : MODALE : AJOUTER UN ADMINISTRATEUR ===== -->
+  <div id="modal-adm-add" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adm-add-title">
+    <div class="modal-panel">
+      <button id="btn-adm-add-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
+      <h2 id="adm-add-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Ajouter un administrateur</h2>
+      <form id="form-adm-add" class="space-y-4 mt-4" novalidate>
+        <div>
+          <label class="field-label" for="a-email"><i class="fab fa-google"></i> Gmail (compte Google)</label>
+          <input class="field" id="a-email" type="email" autocomplete="off" maxlength="120" placeholder="prenom@gmail.com">
+          <p class="text-xs text-slate-500 mt-1">La personne se connectera à cet espace avec CE compte Google (bouton « Continuer avec Gmail »).</p>
+        </div>
+        <div>
+          <label class="field-label" for="a-nom"><i class="fas fa-user"></i> Nom affiché <span class="font-normal text-slate-400">(facultatif)</span></label>
+          <input class="field" id="a-nom" type="text" maxlength="60" placeholder="Ex : Awa — gestion des commandes">
+        </div>
+        <p id="adm-add-error" class="form-error hidden" role="alert"></p>
+        <button id="btn-adm-add-submit" type="submit" class="btn-main"><i class="fas fa-user-plus mr-2"></i> Ajouter</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== V4 : MODALE : MODIFIER UN PROFIL ADMINISTRATEUR ===== -->
+  <div id="modal-adm-edit" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="adm-edit-title">
+    <div class="modal-panel">
+      <button id="btn-adm-edit-close" type="button" class="absolute top-3 right-3 w-10 h-10 rounded-full bg-slate-100 text-slate-600 active:scale-90" aria-label="Fermer"><i class="fas fa-times"></i></button>
+      <h2 id="adm-edit-title" class="text-lg font-extrabold text-brand-navy text-center pr-6">Profil administrateur</h2>
+      <p id="e-email" class="text-center text-sm font-bold text-slate-600 break-all mt-1"></p>
+      <form id="form-adm-edit" class="space-y-4 mt-4" novalidate>
+        <div>
+          <label class="field-label" for="e-nom"><i class="fas fa-user"></i> Nom affiché</label>
+          <input class="field" id="e-nom" type="text" maxlength="60">
+        </div>
+        <div>
+          <label class="field-label" for="e-chat"><i class="fab fa-telegram"></i> Chat ID Telegram <span class="font-normal text-slate-400">(pour recevoir les commandes)</span></label>
+          <input class="field" id="e-chat" type="text" inputmode="numeric" autocomplete="off" maxlength="40" placeholder="Ex : 123456789 (laissez vide pour ne rien recevoir)">
+          <p class="text-xs text-slate-500 mt-1">Ouvrez d'abord le bot de la boutique et envoyez-lui /start. Votre Chat ID s'obtient avec @userinfobot.</p>
+        </div>
+        <div id="e-role-box">
+          <label class="field-label" for="e-role"><i class="fas fa-shield-alt"></i> Rôle</label>
+          <select class="field" id="e-role"><option value="admin">Administrateur</option><option value="principal">Administrateur principal (peut gérer les administrateurs et le bot)</option></select>
+        </div>
+        <label id="e-actif-box" class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input id="e-actif" type="checkbox" class="w-5 h-5 accent-brand" checked> Accès autorisé (décochez pour suspendre)</label>
+        <p id="adm-edit-error" class="form-error hidden" role="alert"></p>
+        <button id="btn-adm-edit-submit" type="submit" class="btn-main"><i class="fas fa-check mr-2"></i> Enregistrer</button>
       </form>
     </div>
   </div>
