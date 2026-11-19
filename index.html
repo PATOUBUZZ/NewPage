@@ -11,37 +11,29 @@
   <meta property="og:description" content="Commandez directement sur WhatsApp. Paiement à la livraison.">
   <link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Cpath d='M18 46V18h6l16 21V18h6v28h-6L24 25v21z' fill='%23fff'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
+  <!-- AJOUT : bannière promo, icônes TikTok/Facebook, grille 5 colonnes sur ordinateur (n'altère pas style.css) -->
+  <link rel="stylesheet" href="promo.css">
 </head>
 <body>
 
-  <!-- ═════ ZONE FIXE (V2) : en-tête de 20vh avec l'IMAGE DE COUVERTURE du vendeur en arrière-plan ═════
-       Empilement, de bas en haut :
-         1) dégradé de la couleur de la boutique (affiché si le vendeur n'a pas encore choisi de couverture)
-         2) image de couverture (injectée par app.js depuis boutique.cover_url)
-         3) filtre sombre en dégradé  → le texte et l'icône du panier restent lisibles quelle que soit l'image
-         4) premier plan : bande défilante (annonces), logo + nom de la boutique, panier
-       La hauteur est fixée à 20vh (1,2 sur 6 de l'écran) dans style.css (.site-header). -->
+  <!-- ═════ ZONE FIXE : bande défilante (tout en haut) + en-tête (logo, nom, panier) ═════ -->
   <div class="top-fixed" id="top-fixed">
-    <header class="site-header" id="site-header">
-      <div class="header-cover" id="header-cover" aria-hidden="true"></div>
-      <div class="header-shade" aria-hidden="true"></div>
+    <!-- Bande défilante infinie : remplie par app.js à partir de la table « annonces » (masquée s'il n'y a aucun message) -->
+    <div class="ticker" id="ticker" hidden aria-label="Annonces de la boutique">
+      <div class="ticker-track" id="ticker-track"></div>
+    </div>
 
-      <!-- Bande défilante infinie : remplie par app.js à partir de la table « annonces » (masquée s'il n'y a aucun message) -->
-      <div class="ticker" id="ticker" hidden aria-label="Annonces de la boutique">
-        <div class="ticker-track" id="ticker-track"></div>
-      </div>
-
-      <!-- Nom de la boutique (gauche) + panier (droite), superposés à l'image -->
-      <div class="header-bar">
-        <a class="brand" id="brand-link" href="./" aria-label="Retour à tous les produits">
-          <span class="brand-logo" id="brand-logo" aria-hidden="true"></span>
-          <span class="brand-name" id="brand-name">Boutique</span>
-        </a>
-        <button class="cart-btn" id="cart-btn" type="button" aria-label="Ouvrir le panier">
-          <span id="cart-icon"></span>
-          <span class="cart-badge" id="cart-count" hidden>0</span>
-        </button>
-      </div>
+    <header class="site-header">
+      <a class="brand" id="brand-link" href="./" aria-label="Retour à tous les produits">
+        <span class="brand-logo" id="brand-logo" aria-hidden="true"></span>
+        <span class="brand-name" id="brand-name">Boutique</span>
+      </a>
+      <!-- AJOUT : icônes TikTok / Facebook (remplies par promo.js ; masquées si le vendeur n'a renseigné aucun lien) -->
+      <div class="header-social" id="header-social" hidden></div>
+      <button class="cart-btn" id="cart-btn" type="button" aria-label="Ouvrir le panier">
+        <span id="cart-icon"></span>
+        <span class="cart-badge" id="cart-count" hidden>0</span>
+      </button>
     </header>
   </div>
 
@@ -49,6 +41,8 @@
 
     <!-- ═════ VUE 1 : GRILLE 2×2 de tous les produits ═════ -->
     <section id="grid-view" aria-label="Produits">
+      <!-- AJOUT : bannière promo (carrousel infini de 3 diapositives), construite par promo.js ; masquée si désactivée par le vendeur -->
+      <section class="promo-banner" id="promo-banner" aria-label="Promotions" hidden></section>
       <div class="grid" id="grid" aria-live="polite"></div>
       <div id="sentinel" aria-hidden="true"></div>
       <div class="state-msg" id="state-msg" hidden></div>
@@ -107,5 +101,6 @@
   <script src="config.js"></script>
   <script src="shared.js"></script>
   <script src="app.js"></script>
+  <script src="promo.js"></script>
 </body>
 </html>

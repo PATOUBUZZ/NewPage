@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Espace vendeur · V2</title>
+  <title>Espace vendeur</title>
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#0B1F4D">
 
@@ -26,6 +26,8 @@
     };
   </script>
   <link rel="stylesheet" href="vendeur.css">
+  <!-- AJOUT : styles des sections « Bannière promo » et « Réseaux sociaux » (n'altère pas vendeur.css) -->
+  <link rel="stylesheet" href="vendeur-promo.css">
 </head>
 
 <body class="bg-slate-50 text-slate-900 font-sans antialiased">
@@ -162,26 +164,40 @@
       <p class="text-xs text-slate-500 -mt-1 mb-3">Messages qui défilent tout en haut de votre site (10 maximum).</p>
       <div id="ann-list" class="space-y-2" aria-live="polite"></div>
 
-      <!-- ═════ V2 : IMAGE DE COUVERTURE (arrière-plan de l'en-tête du site) ═════ -->
-      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-image text-deal"></i> Image de couverture</h3>
-      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4">
-        <!-- Aperçu fidèle de l'en-tête du site : image + filtre sombre + nom + panier -->
-        <div class="cover-preview" id="cover-preview">
-          <img id="cover-img" class="hidden" alt="Aperçu de l'image de couverture">
-          <div class="cover-shade" aria-hidden="true"></div>
-          <p id="cover-empty" class="cover-empty">Aucune image : le site affiche le dégradé de la couleur de votre boutique.</p>
-          <div class="cover-bar" aria-hidden="true">
-            <span id="cover-preview-name" class="cover-name">Ma boutique</span>
-            <span class="cover-cart"><i class="fas fa-shopping-cart"></i></span>
+      <!-- ═════ AJOUT : BANNIÈRE PROMO (carrousel de 3 diapositives) — piloté par vendeur-promo.js ═════ -->
+      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-images text-deal"></i> Bannière promo</h3>
+      <div id="promo-card" class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-sm">
+        <p id="promo-setup" class="form-error promo-setup hidden"></p>
+
+        <label class="nb-switch-row" for="promo-actif">
+          <span class="font-bold text-slate-800"><i class="fas fa-power-off text-deal mr-1"></i> Afficher la bannière sur mon site</span>
+          <input id="promo-actif" type="checkbox" class="nb-switch">
+        </label>
+        <p class="text-xs text-slate-500 mt-2">Carrousel de 3 diapositives juste sous l'en-tête de votre site : une image d'un côté, un titre et un texte de l'autre. Il défile tout seul, en boucle.</p>
+
+        <div id="promo-slides" class="mt-4 space-y-3"></div>
+
+        <p id="promo-error" class="form-error hidden mt-3" role="alert"></p>
+        <button id="btn-promo-save" type="button" class="btn-main mt-4"><i class="fas fa-check mr-2"></i> Enregistrer la bannière</button>
+      </div>
+
+      <!-- ═════ AJOUT : RÉSEAUX SOCIAUX (icônes en haut à droite du site) ═════ -->
+      <h3 class="mt-7 mb-3 font-extrabold text-brand-navy flex items-center gap-2"><i class="fas fa-share-alt text-deal"></i> Réseaux sociaux</h3>
+      <div id="social-card" class="rounded-2xl bg-white border border-slate-200 shadow-sm p-4 text-sm">
+        <p id="social-setup" class="form-error promo-setup hidden"></p>
+        <p class="text-xs text-slate-500 mb-3">Vos clients voient les icônes TikTok et Facebook en haut à droite de votre site. Laissez un champ vide pour masquer l'icône correspondante.</p>
+        <div class="space-y-4">
+          <div>
+            <label class="field-label" for="s-tiktok"><svg class="inline-block -mt-0.5 mr-1 text-brand" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg> Votre profil TikTok</label>
+            <input class="field" id="s-tiktok" type="text" inputmode="url" maxlength="300" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="@monpseudo  ou  https://www.tiktok.com/@monpseudo">
+          </div>
+          <div>
+            <label class="field-label" for="s-facebook"><i class="fab fa-facebook"></i> Votre page Facebook</label>
+            <input class="field" id="s-facebook" type="text" inputmode="url" maxlength="300" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="nom-de-ma-page  ou  https://www.facebook.com/nom-de-ma-page">
           </div>
         </div>
-        <p class="text-xs text-slate-500 mt-3">Cette image s'affiche en arrière-plan de l'en-tête de votre site (20 % de la hauteur de l'écran). Un filtre sombre est ajouté automatiquement pour que le nom et le panier restent lisibles. Choisissez une image <strong>large</strong> (paysage) ; elle est allégée automatiquement.</p>
-        <input id="f-cover" type="file" accept="image/*" class="hidden">
-        <div class="grid grid-cols-2 gap-2 mt-3">
-          <label for="f-cover" class="action-btn" id="btn-cover-choose"><i class="fas fa-camera"></i> <span id="btn-cover-label">Choisir une image</span></label>
-          <button id="btn-cover-remove" type="button" class="action-btn action-btn-ghost disabled:opacity-50"><i class="fas fa-trash"></i> Retirer</button>
-        </div>
-        <p id="cover-error" class="form-error hidden mt-3" role="alert"></p>
+        <p id="social-error" class="form-error hidden mt-3" role="alert"></p>
+        <button id="btn-social-save" type="button" class="btn-main mt-4"><i class="fas fa-check mr-2"></i> Enregistrer les liens</button>
       </div>
 
       <!-- Informations de la boutique -->
@@ -371,5 +387,6 @@
   <script src="config.js"></script>
   <script src="shared.js"></script>
   <script src="vendeur.js"></script>
+  <script src="vendeur-promo.js"></script>
 </body>
 </html>

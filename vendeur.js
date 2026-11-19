@@ -1,5 +1,5 @@
 /* ============================================================================
-   vendeur.js — VERSION 2 — Espace vendeur (vendeur.html) — même interface que l'ancien espace vendeur Nya-Market,
+   vendeur.js — Espace vendeur (vendeur.html) — même interface que l'ancien espace vendeur Nya-Market,
    SANS documents ni selfie.
    ----------------------------------------------------------------------------
    • Connexion Google ; accès UNIQUEMENT si le Gmail est dans la table « proprietaires » (fonction SQL est_proprietaire()).
@@ -11,7 +11,6 @@
    • Photos : ≤ 120 Ko → envoyées telles quelles ; > 120 Ko → WebP ≤ 130 Ko, meilleure qualité possible.
    • Bande défilante : ajouter / modifier / réordonner / masquer / supprimer (table « annonces », 10 maximum).
    • Informations : nom, propriétaire, description, WhatsApp, ville, localisation (table « boutique »).
-   • V2 : IMAGE DE COUVERTURE de l'en-tête du site (boutique.cover_url) : choisir / changer / retirer, avec compression automatique.
    Toutes les données du vendeur sont échappées (esc) avant affichage : aucune injection HTML possible.
    ============================================================================ */
 (function () {
@@ -57,8 +56,6 @@
     var m = String((e && (e.message || e.error_description)) || e || 'Erreur inconnue');
     if (/row-level security|violates row|permission denied|PGRST116|42501/i.test(m)) return 'Accès refusé : reconnectez-vous avec le compte propriétaire.';
     if (/Limite de/i.test(m)) return m;
-    if (/cover_url/i.test(m) && /column|schema cache|find/i.test(m)) return 'Base de données non à jour : lancez SQL/4-v2-couverture.sql dans Supabase.';
-    if (/cover_url/i.test(m)) return 'Adresse de l’image de couverture invalide.';
     if (/plus_infos/i.test(m)) return '« Plus d’informations » : 60 mots maximum.';
     if (/ancien_prix/i.test(m)) return 'Le prix promotionnel doit être inférieur au prix normal.';
     if (/images/i.test(m) && /check|violat/i.test(m)) return 'Il faut entre 1 et 4 photos valides.';
@@ -219,7 +216,7 @@
     });
   }
 
-  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerAnnonces(); dessinerCouverture(); majContacts(); }
+  function dessinerTout() { dessinerBoutique(); dessinerProduits(); dessinerAnnonces(); majContacts(); }
 
   /* ───────────────────────────── Carte boutique ───────────────────────────── */
   function urlBoutique() { return location.origin + location.pathname.replace(/[^\/]*$/, ''); }
@@ -571,53 +568,6 @@
     executer(p, 'Bande défilante mise à jour ✓').then(function (ok) { occupeBtn(btn, false); if (ok) fermerModal('modal-ann'); else erreur('ann-error', 'Enregistrement impossible.'); });
   }
 
-  /* ───────────────────────────── V2 : image de couverture de l'en-tête ───────────────────────────── */
-  function dessinerCouverture() {
-    var b = S.boutique || {}, u = NB.urlImage(b.cover_url), im = $('cover-img');
-    if (u) im.src = u; else im.removeAttribute('src');
-    im.classList.toggle('hidden', !u);
-    $('cover-empty').classList.toggle('hidden', !!u);
-    $('cover-preview-name').textContent = b.nom || 'Ma boutique';
-    $('btn-cover-remove').disabled = !u;
-    $('btn-cover-label').textContent = u ? 'Changer l’image' : 'Choisir une image';
-  }
-
-  /** Compresse (≤ 130 Ko) → envoie dans le stockage → enregistre l'adresse → supprime l'ancienne image. */
-  function changerCouverture(fichier) {
-    erreur('cover-error', '');
-    var ancienne = NB.urlImage((S.boutique || {}).cover_url), neuve = null, publie = false;
-    occupe('Optimisation de l’image…');
-    return compresserImage(fichier).then(function (r) {
-      occupe('Envoi de l’image…');
-      return envoyerFichier('couverture', r);
-    }).then(function (r) {
-      neuve = r.url;
-      return sb.from('boutique').update({ cover_url: neuve }).eq('id', 1).select().single();
-    }).then(function (r) {
-      if (r.error) throw r.error;
-      publie = true;                                                         // à partir d'ici la nouvelle image est en ligne
-      return supprimerFichiers(ancienne ? [ancienne] : []);
-    }).then(function () { invaliderCache(); return chargerTout(); })
-      .then(function () { toast('Image de couverture enregistrée ✓ Visible d’ici ' + cfg.cacheMinutes + ' min environ.'); })
-      .catch(function (e) {
-        var nettoyage = (neuve && !publie) ? supprimerFichiers([neuve]) : Promise.resolve();   // échec avant publication : on retire le fichier envoyé
-        return nettoyage.then(function () { erreur('cover-error', 'Échec : ' + messageErreur(e)); });
-      })
-      .then(function () { occupe(false); });
-  }
-
-  function retirerCouverture() {
-    var ancienne = NB.urlImage((S.boutique || {}).cover_url); if (!ancienne) return;
-    if (!window.confirm('Retirer l’image de couverture ? Le site affichera le dégradé de la couleur de votre boutique.')) return;
-    erreur('cover-error', ''); occupe('Suppression…');
-    sb.from('boutique').update({ cover_url: null }).eq('id', 1).select().single()
-      .then(function (r) { if (r.error) throw r.error; return supprimerFichiers([ancienne]); })
-      .then(function () { invaliderCache(); return chargerTout(); })
-      .then(function () { toast('Image de couverture retirée.'); })
-      .catch(function (e) { erreur('cover-error', 'Échec : ' + messageErreur(e)); })
-      .then(function () { occupe(false); });
-  }
-
   /* ───────────────────────────── Démarrage ───────────────────────────── */
   function init() {
     Array.prototype.forEach.call(document.querySelectorAll('.devise'), function (n) { n.textContent = cfg.devise; });
@@ -628,6 +578,7 @@
       vue('landing'); cacherLoader(); erreur('login-error', 'Configuration manquante : renseignez supabaseUrl et supabaseKey dans config.js.'); $('btn-google').disabled = true; return;
     }
     sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+    NB.sb = sb;       // AJOUT : partage le client Supabase (même session) avec vendeur-promo.js
 
     $('btn-google').onclick = connexion;
     $('btn-logout').onclick = deconnexion;
@@ -662,10 +613,6 @@
     $('btn-ann-close').onclick = function () { fermerModal('modal-ann'); };
     $('a-msg').addEventListener('input', function () { $('a-count').textContent = $('a-msg').value.length + ' / 160'; });
     $('form-ann').addEventListener('submit', enregistrerAnnonce);
-
-    // V2 : image de couverture
-    $('f-cover').addEventListener('change', function (e) { var f = e.target.files && e.target.files[0]; if (f) changerCouverture(f).then(function () { e.target.value = ''; }); });
-    $('btn-cover-remove').onclick = retirerCouverture;
 
     ['modal-loc', 'modal-shop', 'modal-ann'].forEach(function (id) { $(id).addEventListener('click', function (e) { if (e.target === this) fermerModal(id); }); });
     document.addEventListener('keydown', function (e) {
