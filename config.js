@@ -9,8 +9,8 @@ window.NB_CONFIG = {
      • supabaseUrl : « Project URL »            ex. https://abcdefgh.supabase.co
      • supabaseKey : clé PUBLIQUE (« anon » ou « publishable »).
        ⚠️ Ne mettez JAMAIS la clé « service_role » / « secret » ici.            */
-  supabaseUrl: 'https://VOTRE-PROJET.supabase.co',
-  supabaseKey: 'VOTRE_CLE_PUBLIQUE_ANON',
+  supabaseUrl: 'https://pffewftmptdpzwlavhxe.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZmV3ZnRtcHRkcHp3bGF2aHhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUwNjc0MjQsImV4cCI6MjExMDY0MzQyNH0.8BdtA6DIEnpjPLz9hc0JY7w5i_DyPLH0K5dD25OkW5U',
 
   /* ── 2) CACHE : durée pendant laquelle le navigateur du visiteur réutilise les
         données sans interroger Supabase. Les modifications du propriétaire
